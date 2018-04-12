@@ -2,6 +2,77 @@
 Imports System.Text.RegularExpressions
 Imports Miz_MMD_Tool
 
+Module mMath
+    Private NDTable As New List(Of PointF)
+
+    Public Sub InitNDTable()
+        For i = -400 To 399
+            Dim tx As Double = i / 100
+            Dim tv As Double = CND(tx)
+            NDTable.Add(New PointF(CSng(tx), CSng(tv)))
+        Next
+    End Sub
+
+    Public Function RCND(Acc As Single) As Single
+        For i = 0 To NDTable.Count - 2
+            If Acc < NDTable(i + 1).Y AndAlso Acc >= NDTable(i).Y Then
+                Return NDTable(i).X
+            End If
+        Next
+        Return 3.99
+    End Function
+
+    Public Function CND(X As Double) As Double
+
+        Dim L As Double = 0.0
+        Dim K As Double = 0.0
+        Dim dCND As Double = 0.0
+        Const a1 As Double = 0.31938153
+        Const a2 As Double = -0.356563782
+        Const a3 As Double = 1.781477937
+        Const a4 As Double = -1.821255978
+        Const a5 As Double = 1.330274429
+        L = Abs(X)
+        K = 1.0 / (1.0 + 0.2316419 * L)
+        dCND = 1.0 - 1.0 / Sqrt(2 * Convert.ToDouble(PI.ToString())) * Exp(-L * L / 2.0) * (a1 * K + a2 * K * K + a3 * Pow(K, 3.0) + a4 * Pow(K, 4.0) + a5 * Pow(K, 5.0))
+
+        If (X < 0) Then
+            Return 1.0 - dCND
+        Else
+        End If
+        Return dCND
+
+    End Function
+
+    Public Function getpi(nums As Integer) As String
+        nums = nums / 5
+        Dim max As Long, result() As String
+        Dim i As Long, j As Long, t, d As Long, g, k As Long, f()
+        max = 18 * nums
+        ReDim f(0 To max)
+        ReDim result(nums)
+        For i = 0 To max
+            f(i) = 20000
+        Next
+        g = 20000
+        For j = max To 1 Step -18
+            t = 0
+            For i = j To 1 Step -1
+                t = t + f(i) * 100000
+                d = 2 * i + 1
+                f(i) = t - Int(t / d) * d
+                t = Int(t / d) * i
+            Next
+            k = k + 1
+            result(k) = Format(Int(g + t / 100000) Mod 100000, "00000")
+
+            g = t Mod 100000
+        Next
+        Return Join(result, "")
+    End Function
+
+End Module
+
 Module mHex
     Public Function GetByte(ByRef BContent As List(Of String), pos As Integer) As Byte
         Dim tl As Integer = pos \ 2000
@@ -113,7 +184,7 @@ Module mMMD
         Public X As Byte
         Public Y As Byte
 
-        Public Sub Init(tx As Byte, ty As Byte)
+        Public Sub New(Optional tx As Byte = 0, Optional ty As Byte = 0)
             X = tx
             Y = ty
         End Sub
@@ -247,10 +318,10 @@ Module mMMD
         End Property
         Public Property SZ As Single
             Get
-                Return SSZ
+                Return -SSZ
             End Get
             Set(value As Single)
-                SSZ = value
+                SSZ = -value
                 Call CalcQuaternion()
             End Set
 
@@ -407,6 +478,18 @@ Module mMMD
             Return r
         End Function
 
+        Public Sub DefaultTween()
+            TWXA = New PointB(20, 20)
+            TWXB = New PointB(107, 107)
+            TWYA = New PointB(20, 20)
+            TWYB = New PointB(107, 107)
+            TWZA = New PointB(20, 20)
+            TWZB = New PointB(107, 107)
+            TWRA = New PointB(20, 20)
+            TWRB = New PointB(107, 107)
+
+        End Sub
+
         Public Sub Apply(tp As MMDPoint) Implements MMDPoint.Apply
             Dim ttp As BonePoint = CType(tp, BonePoint)
             With ttp
@@ -493,12 +576,20 @@ Module mMMD
             Return r
         End Function
 
+        Public Sub New(Optional tf As Integer = 0, Optional tv As Single = 0)
+            Frame = tf
+            V = tv
+        End Sub
+
         Public Sub Init(tv As Single)
             V = tv
         End Sub
 
         Public Sub Apply(tp As MMDPoint) Implements MMDPoint.Apply
-            Throw New NotImplementedException()
+            Dim ttp As FacePoint = CType(tp, FacePoint)
+            With ttp
+                V = .V
+            End With
         End Sub
     End Class
 

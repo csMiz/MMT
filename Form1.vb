@@ -320,7 +320,7 @@ lblFail:
         ListFace = New List(Of Face)
 
         tFont = New Font("Microsoft YaHei", 18)
-
+        Call InitNDTable()
 
     End Sub
 
@@ -389,7 +389,9 @@ lblFail:
                     Else
                         PostMsg("未选中任何点")
                     End If
-
+                ElseIf tcmd = "nd" Then
+                    Dim tv As Double = CDbl(tst(1))
+                    PostMsg(CND(tv))
                 End If
 
             ElseIf tst.Length = 3 Then
@@ -406,6 +408,16 @@ lblFail:
                     tp.Apply(ClipBoard)
                     ListBone(CInt(tst(1))).AddPoint(tp)
                     Call SortPoint()
+                    Call Paint()
+                ElseIf tcmd = "blink" Then
+                    Dim tInterval As Short = CShort(tst(1)) '单位为帧
+                    Dim tLength As Integer = CInt(tst(2))   '单位为帧
+                    Call SetBlink(tInterval, tLength)
+                    Call Paint()
+                ElseIf tcmd = "shakeaspi" Then
+                    Dim tInterval As Short = CShort(tst(1)) '单位为帧
+                    Dim tLength As Integer = CInt(tst(2))   '单位为帧
+                    Call ShakeAsPi(tInterval, tLength)
                     Call Paint()
 
                 End If
@@ -616,6 +628,60 @@ lblFail:
             Next
         End If
 
+
+    End Sub
+
+    Public Sub ShakeAsPi(Interval As Short, Len As Integer)
+        Dim pointer As Integer = 0
+        Dim digitcount As Integer = 0
+        Dim tpi As String = getpi(1000)
+
+        Do
+            Dim tg As Byte = CInt(tpi.Substring(digitcount, 1))
+            digitcount += 1
+            Dim p1 As New BonePoint
+            With p1
+                .Frame = pointer
+                .SZ = -18 + 4 * tg
+                .DefaultTween()
+            End With
+            ListBone(0).AddPoint(p1)
+            pointer += 10
+            Dim p2 As BonePoint = p1.Copy
+            p2.DefaultTween()
+            p2.Frame = pointer
+            ListBone(0).AddPoint(p2)
+
+            pointer += Interval
+        Loop While pointer < Len
+
+
+    End Sub
+
+    Public Sub SetBlink(Interval As Short, Len As Integer)
+        Dim pointer As Integer = 0
+        Dim ran As New Random()
+
+        Do
+
+            Dim tacc As Single = CSng(ran.NextDouble())
+            Dim tx As Integer = CInt((RCND(tacc) + 4) * Interval / 4)
+
+            pointer += tx
+            ListFace(0).AddPoint(New FacePoint(pointer, 0))
+            pointer += 1
+            ListFace(0).AddPoint(New FacePoint(pointer, 0.5))
+            pointer += 1
+            ListFace(0).AddPoint(New FacePoint(pointer, 1))
+            pointer += 1
+            ListFace(0).AddPoint(New FacePoint(pointer, 1))
+            pointer += 1
+            ListFace(0).AddPoint(New FacePoint(pointer, 0.6))
+            pointer += 1
+            ListFace(0).AddPoint(New FacePoint(pointer, 0))
+            pointer += 1
+
+        Loop While pointer < len
 
     End Sub
 
