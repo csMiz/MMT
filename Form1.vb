@@ -18,6 +18,7 @@ Public Class Form1
     Private ClipBoard As MMDPoint
 
     Public ShowingFrame As Integer = 0
+    Public ShowingBone As Integer = 0
 
     Public Enum SaveFileParam As Byte
         SaveNew = 0
@@ -150,6 +151,7 @@ Public Class Form1
                 VMDStorage.Add(tcline)
             Next
             r.Close()
+            tstr.Dispose()
 
             PostMsg("正在分析")
 
@@ -362,6 +364,11 @@ lblFail:
                     ClipBoard = SelectedPoint.Copy
                     ListBone(SelectedPointBone).PointList.Remove(CType(SelectedPoint, BonePoint))
                     SelectedPoint = Nothing
+                ElseIf tcmd = "cls" Then
+                    TB1.Text = ""
+                ElseIf tcmd = "mouth" Then
+                    Call OpenReadingText()
+                    Call Paint()
 
                 Else
                     PostMsg("未知指令")
@@ -682,6 +689,230 @@ lblFail:
             pointer += 1
 
         Loop While pointer < len
+
+    End Sub
+
+    Public Sub OpenReadingText()
+        Dim openFile As New OpenFileDialog
+        openFile.Filter = "拼音文档|*.txt"
+        openFile.Title = "打开"
+        openFile.AddExtension = True
+        openFile.AutoUpgradeEnabled = True
+        If openFile.ShowDialog() = DialogResult.OK Then
+            Dim tstr As FileStream = CType(openFile.OpenFile, FileStream)
+            Dim r As StreamReader = New StreamReader(tstr)
+            PostMsg("正在读取拼音")
+
+            Dim pytext As String = ""
+
+            pytext = r.ReadToEnd
+
+            r.Close()
+            tstr.Dispose()
+
+            PostMsg("正在分析拼音")
+
+            Call LoadText(pytext)
+
+            PostMsg("共读取" & ListPY.Count & "个")
+            PostMsg("正在转换为口型")
+            Application.DoEvents()
+
+            If ListPY.Count Then
+                Dim pointer As Integer = 0
+                Dim seveneight As Short = 7
+                Dim progresscount As Integer = 0
+                For i = 0 To ListPY.Count - 1
+                    Dim tpy As cPinyin = ListPY(i)
+                    If tpy.isPause Then
+                        For j = 0 To 4
+                            Dim p1 As New FacePoint(pointer, 0)
+                            ListFace(j).AddPoint(p1)
+                            Dim p2 As New FacePoint(pointer + seveneight - 1, 0)
+                            ListFace(j).AddPoint(p2)
+                        Next
+                    ElseIf tpy.Special <> SpecialPinyin.None Then
+                        If tpy.Special = SpecialPinyin.ZhiChiShiRiZiCiSi Then
+                            Dim tk() As Short = {0, 1, 2, -1}
+                            Dim tv() As Single = {0.15, 0.3, 0.5, 0.5}
+                            For j = 0 To tk.Count - 1
+                                If j = tk.Count - 1 Then
+                                    Dim p1 As New FacePoint(pointer + seveneight - 1, tv(j))
+                                    ListFace(1).AddPoint(p1)    'i
+                                    Dim p2 As New FacePoint(pointer + seveneight - 1, tv(j))
+                                    ListFace(3).AddPoint(p2)    'e
+                                Else
+                                    Dim p1 As New FacePoint(pointer + tk(j), tv(j))
+                                    ListFace(1).AddPoint(p1)    'i
+                                    Dim p2 As New FacePoint(pointer + tk(j), tv(j))
+                                    ListFace(3).AddPoint(p2)    'e
+                                End If
+
+                            Next
+                        ElseIf tpy.Special = SpecialPinyin.Yu Then
+                            Dim p1 As New FacePoint(pointer, 0.6)
+                            ListFace(2).AddPoint(p1)    'u
+                            Dim p2 As New FacePoint(pointer + seveneight - 1, 0.6)
+                            ListFace(2).AddPoint(p2)    'u
+                        End If
+                    Else
+                        With tpy
+                            Dim sep() As Short
+                            Dim vc As Short = .Vowel.Count
+                            If vc = 0 Then
+                                PostMsg("错误：没有元音 拼音：" & .Pinyin)
+                                Exit Sub
+                            ElseIf vc = 1 Then
+                                sep = {0, -1}
+                            ElseIf vc = 2 Then
+                                sep = {0, 4, -1}
+                            ElseIf vc = 3 Then
+                                sep = {0, 2, 4, -1}
+                            Else
+                                PostMsg("错误：太多元音 拼音：" & .Pinyin)
+                                Exit Sub
+                            End If
+
+                            'If vc = 3 AndAlso (.CloseMouth = CloseMouthParam.Before Or .CloseMouth = CloseMouthParam.Both) Then
+                            '    PostMsg("错误：三元音闭口冲突 拼音：" & .Pinyin)
+                            '    Exit Sub
+                            'End If
+
+                            Dim tsta As Byte = 0
+                            Dim tend As Byte = seveneight
+                            If .CloseMouth = CloseMouthParam.Before Or .CloseMouth = CloseMouthParam.Both Then
+                                tsta = 2
+                                For j = 0 To 4
+                                    SubAddVowel(pointer, 0, j)
+                                    SubAddVowel(pointer + 1, 0, j)
+                                Next
+                            End If
+                            If .CloseMouth = CloseMouthParam.SemiAfter Or .CloseMouth = CloseMouthParam.Both Then
+                                tend -= 2
+                            End If
+                            If vc = 1 Then
+                                Dim tvo As Byte = .Vowel(0)
+                                If .SingleE AndAlso tvo = 3 Then
+                                    tvo = 5     '【饿】的发音
+                                End If
+
+                                SubAddVowel(pointer + tsta, 0.1, tvo)
+                                Dim midf As Short = CShort((tsta + seveneight) / 2)
+                                SubAddVowel(pointer + midf - 1, 0.5, tvo)
+                                SubAddVowel(pointer + tend, 0.5, tvo)
+
+                            ElseIf vc = 2 Then
+                                Dim tvo1 As Byte = .Vowel(0)
+                                Dim tvo2 As Byte = .Vowel(1)
+                                If .SingleE Then
+                                    If tvo1 = 3 Then
+                                        tvo1 = 5
+                                    End If
+                                    If tvo2 = 3 Then
+                                        tvo2 = 5
+                                    End If
+                                End If
+                                If .ChangedA AndAlso tvo2 = 0 Then
+                                    tvo2 = 3    'ian
+                                End If
+
+                                SubAddVowel(pointer + tsta, 0.1, tvo1)
+                                Dim midf As Short = CShort((tsta + seveneight) / 2)
+                                SubAddVowel(pointer + midf - 2, 0.55, tvo1)
+                                SubAddVowel(pointer + midf, 0, tvo1)
+
+                                SubAddVowel(pointer + midf - 2, 0, tvo2)
+                                SubAddVowel(pointer + midf, 0.55, tvo2)
+                                SubAddVowel(pointer + tend, 0.1, tvo2)
+
+                            ElseIf vc = 3 Then
+                                Dim tvo1 As Byte = .Vowel(0)
+                                Dim tvo2 As Byte = .Vowel(1)
+                                Dim tvo3 As Byte = .Vowel(2)
+                                If .SingleE Then
+                                    If tvo1 = 3 Then
+                                        tvo1 = 5
+                                    End If
+                                    If tvo2 = 3 Then
+                                        tvo2 = 5
+                                    End If
+                                    If tvo3 = 3 Then
+                                        tvo3 = 5
+                                    End If
+                                End If
+                                If .ChangedA AndAlso tvo3 = 0 Then
+                                    tvo3 = 3
+                                End If
+
+                                If tsta = 0 Then
+                                    SubAddVowel(pointer, 0.1, tvo1)
+                                    SubAddVowel(pointer, 0, tvo2)
+
+                                    SubAddVowel(pointer + 1, 0.3, tvo1)
+
+                                    SubAddVowel(pointer + 2, 0, tvo1)
+                                    SubAddVowel(pointer + 2, 0.4, tvo2)
+                                Else
+                                    SubAddVowel(pointer + 2, 0.15, tvo1)
+                                    SubAddVowel(pointer + 2, 0.1, tvo2)
+
+                                    SubAddVowel(pointer + 3, 0, tvo1)
+                                End If
+
+                                SubAddVowel(pointer + 3, 0.3, tvo2)
+                                SubAddVowel(pointer + 3, 0, tvo3)
+
+                                SubAddVowel(pointer + 4, 0.4, tvo3)
+
+                                SubAddVowel(pointer + 5, 0, tvo2)
+                                SubAddVowel(pointer + 5, 0.5, tvo3)
+
+                                SubAddVowel(pointer + tend, 0.1, tvo3)
+
+
+                            End If
+                            If .CloseMouth = CloseMouthParam.SemiAfter Or .CloseMouth = CloseMouthParam.Both Then
+                                Dim fv As Byte = .Vowel(.Vowel.Count - 1)
+                                If .SingleE AndAlso fv = 3 Then
+                                    fv = 5
+                                End If
+                                If .ChangedA AndAlso fv = 0 Then
+                                    fv = 3    'ian
+                                End If
+                                SubAddVowel(pointer + tend + 1, 0.05, fv)
+                            End If
+
+
+                        End With
+                    End If
+
+
+                    progresscount += 1
+                    If progresscount Mod 100 = 0 Then
+                        PostMsg(progresscount & " / " & ListPY.Count)
+                        Application.DoEvents()
+                    End If
+                    pointer += seveneight
+                    seveneight = 15 - seveneight
+                Next
+            End If
+
+            PostMsg("完成")
+        End If
+
+    End Sub
+
+    Private Sub SubAddVowel(tf As Integer, tv As Single, tvo As Byte)
+
+        If tvo = 5 Then     'e-ex
+            Dim p1 As New FacePoint(tf, tv * 0.75)
+            ListFace(2).AddPoint(p1)    'u
+            Dim p2 As New FacePoint(tf, tv * 0.75)
+            ListFace(3).AddPoint(p2)    'e
+        Else
+            Dim p1 As New FacePoint(tf, tv)
+            ListFace(tvo).AddPoint(p1)
+        End If
 
     End Sub
 
