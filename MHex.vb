@@ -71,6 +71,123 @@ Module mMath
         Return Join(result, "")
     End Function
 
+    Public Class Vector3
+        Public X As Single = 0
+        Public Y As Single = 0
+        Public Z As Single = 0
+
+        Public Sub New(Optional tx As Single = 0, Optional ty As Single = 0, Optional tz As Single = 0)
+            X = tx
+            Y = ty
+            Z = tz
+
+        End Sub
+
+    End Class
+
+    Public Class PointF3
+        Public X As Single = 0, Y As Single = 0, Z As Single = 0
+
+        Public Sub New(Optional tx As Single = 0, Optional ty As Single = 0, Optional tz As Single = 0)
+            X = tx
+            Y = ty
+            Z = tz
+        End Sub
+    End Class
+
+    Public Function Bezier(pCont As List(Of PointF3), t As Double) As PointF3
+        If Not pCont.Count Then Return Nothing
+        Dim r As New PointF3
+        Dim n As Short = pCont.Count - 1
+        For i = 0 To n
+            r.X += PascalT(n, i) * pCont(i).X * (1 - t) ^ (n - i) * t ^ i
+            r.Y += PascalT(n, i) * pCont(i).Y * (1 - t) ^ (n - i) * t ^ i
+            r.Z += PascalT(n, i) * pCont(i).Z * (1 - t) ^ (n - i) * t ^ i
+        Next
+        Return r
+    End Function
+
+    Public Function PascalT(a As Short, t As Short) As Integer
+        Dim r1 As Double = 1
+        Dim r2 As Double = 1
+        If t = 0 Then Return 1
+        For i = 0 To t - 1
+            r1 *= (a - i)
+            r2 *= (i + 1)
+        Next
+        Return CInt(r1 / r2)
+    End Function
+
+
+    Public Class VectorF4
+        Public W As Single = 0, X As Single = 0, Y As Single = 0, Z As Single = 0
+
+        Public Sub New(Optional tw As Single = 0, Optional tx As Single = 0, Optional ty As Single = 0, Optional tz As Single = 0)
+            W = tw
+            X = tx
+            Y = ty
+            Z = tz
+        End Sub
+
+    End Class
+
+    Public Function Slerp(V1 As VectorF4, V2 As VectorF4, t As Double) As VectorF4
+        Dim result As New VectorF4
+        Dim cosa As Single = V1.W * V2.W + V1.X * V2.X + V1.Y * V2.Y + V1.Z * V2.Z
+
+        If (cosa < 0.0F) Then
+            V2.X = -V2.X
+            V2.Y = -V2.Y
+            V2.Y = -V2.Y
+            V2.Z = -V2.Z
+            cosa = -cosa
+        End If
+
+        Dim k0 As Single, k1 As Single
+
+        If (cosa > 0.9995F) Then
+            k0 = 1.0F - t
+            k1 = t
+        Else
+            Dim sina As Single = (1.0F - cosa * cosa) ^ 0.5
+            Dim a As Single = Atan2(sina, cosa)
+            k0 = Sin((1.0F - t) * a) / sina
+            k1 = Sin(t * a) / sina
+        End If
+
+        result.W = V1.W * k0 + V2.W * k1
+        result.X = V1.X * k0 + V2.X * k1
+        result.Y = V1.Y * k0 + V2.Y * k1
+        result.Z = V1.Z * k0 + V2.Z * k1
+
+        Return result
+    End Function
+
+    Public Function ReverseSlerp(V1 As VectorF4, V2 As VectorF4, t As Single) As VectorF4
+
+        Dim result As New VectorF4
+        Dim cosa As Single = V1.W * V2.W + V1.X * V2.X + V1.Y * V2.Y + V1.Z * V2.Z
+        Dim k0 As Single, k1 As Single
+        Dim sina As Single = (1.0F - cosa * cosa) ^ 0.5
+        Dim a As Single = Atan2(sina, cosa)
+
+        If (Cos(a * t) > 0.9995F) Then
+            k0 = (1.0F - t) / t
+            k1 = 1 / t
+        Else
+            k0 = Sin((1.0F - t) * a) / sina
+            k1 = Sin(t * a) / sina
+        End If
+
+        result.W = -V1.W * k0 + V2.W * k1
+        result.X = -V1.X * k0 + V2.X * k1
+        result.Y = -V1.Y * k0 + V2.Y * k1
+        result.Z = -V1.Z * k0 + V2.Z * k1
+
+        Return result
+    End Function
+
+
 End Module
 
 Module mHex
@@ -327,7 +444,7 @@ Module mMMD
 
         End Property
 
-        Public Function GetQuaternion(param As QuaParam) As Single
+        Public Overloads Function GetQuaternion(param As QuaParam) As Single
             Select Case param
                 Case QuaParam.QX
                     Return RX
@@ -340,6 +457,19 @@ Module mMMD
             End Select
             Return 0
         End Function
+
+        Public Overloads Function GetQuaternion() As VectorF4
+            Dim r As VectorF4 = Me.QuaToV4
+            Return r
+        End Function
+
+        Public Sub SetQuaternion(vector As VectorF4)
+            RW = vector.W
+            RX = vector.X
+            RY = vector.Y
+            RZ = vector.Z
+            Call CalcSSRotate()
+        End Sub
 
         Public Sub CalcQuaternion()
             'x = sin(Y/2)sin(Z/2)cos(X/2)+cos(Y/2)cos(Z/2)sin(X/2)
@@ -359,7 +489,7 @@ Module mMMD
 
         End Sub
 
-        Public Sub CalcSSRotate()
+        Public Sub CalcSSRotate()   '这里有问题
 
             SSX = Atan2(2 * (RW * RX + RY * RZ), 1 - 2 * (RX ^ 2 + RY ^ 2))
             SSY = Asin(2 * (RW * RY - RZ * RX))
@@ -408,6 +538,18 @@ Module mMMD
 
             Call CalcSSRotate()
         End Sub
+
+        Public Sub DeltaPos(tv As Vector3)
+            X += tv.X
+            Y += tv.Y
+            Z += tv.Z
+
+        End Sub
+
+        Public Function QuaToV4() As VectorF4
+            Dim r As New VectorF4(RW, RX, RY, RZ)
+            Return r
+        End Function
 
         Public Sub SetTween(input As String)
             TWXA.X = AscW(input.Substring(0, 1))

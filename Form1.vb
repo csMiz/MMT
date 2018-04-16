@@ -1,6 +1,7 @@
 ﻿Imports System.IO
 Imports System.Text.RegularExpressions
 Imports Miz_MMD_Tool
+Imports System.Math
 
 Public Class Form1
 
@@ -29,6 +30,17 @@ Public Class Form1
 
     Public tFont As Font
 
+    Private Function GetBoneFace(Index As Short) As MMDBoneFace
+
+        If Index < ListBone.Count Then
+            Return ListBone(Index)
+        ElseIf Index < ListBone.Count + ListFace.Count Then
+            Return ListFace(Index - ListBone.Count)
+        Else
+            Return Nothing
+        End If
+
+    End Function
 
     Public Shadows Sub Paint()
         '1000*750
@@ -53,10 +65,12 @@ Public Class Form1
             End If
         Next
 
-        If CBool(ListBone.Count) Then
-            For i = 0 To ListBone.Count - 1
-                Dim tbone As Bone = ListBone(i)
-                If Not tbone.IsEmpty Then
+        For i = 0 To 9
+            Dim tbindex As Short = ShowingBone + i
+            Dim tboneface As MMDBoneFace = GetBoneFace(tbindex)
+            If tboneface IsNot Nothing Then
+                If TypeOf tboneface Is Bone Then
+                    Dim tbone As Bone = CType(tboneface, Bone)
                     G.DrawString(tbone.Name, tFont, Brushes.DarkBlue, 5, 55 + i * 50)
                     For j = 0 To tbone.GetPointCount - 1
                         Dim tf As Integer = tbone.PointList(j).Frame - ShowingFrame
@@ -67,28 +81,22 @@ Public Class Form1
                             End If
                         End If
                     Next
-                End If
-            Next
-        End If
-
-        If CBool(ListFace.Count) Then
-            For i = 0 To ListFace.Count - 1
-                Dim tface As Face = ListFace(i)
-                Dim ia As Short = i + ListBone.Count
-                If Not tface.IsEmpty Then
-                    G.DrawString(tface.Name, tFont, Brushes.DarkGreen, 5, 55 + ia * 50)
+                Else
+                    Dim tface As Face = CType(tboneface, Face)
+                    G.DrawString(tface.Name, tFont, Brushes.DarkGreen, 5, 55 + i * 50)
                     For j = 0 To tface.GetPointCount - 1
                         Dim tf As Integer = tface.PointList(j).Frame - ShowingFrame
                         If tf >= -19 AndAlso tf <= 20 Then
-                            G.FillEllipse(Brushes.DarkGray, 190 + 20 * (tf + 19), 65 + ia * 50, 20, 20)
-                            If (SelectedPoint IsNot Nothing) AndAlso ia = SelectedPointBone AndAlso tface.PointList(j).Equals(SelectedPoint) Then
-                                G.FillEllipse(Brushes.DarkRed, 193 + 20 * (tf + 19), 68 + ia * 50, 14, 14)
+                            G.FillEllipse(Brushes.DarkGray, 190 + 20 * (tf + 19), 65 + i * 50, 20, 20)
+                            If (SelectedPoint IsNot Nothing) AndAlso i = SelectedPointBone AndAlso tface.PointList(j).Equals(SelectedPoint) Then
+                                G.FillEllipse(Brushes.DarkRed, 193 + 20 * (tf + 19), 68 + i * 50, 14, 14)
                             End If
                         End If
                     Next
                 End If
-            Next
-        End If
+            End If
+
+        Next
 
         '700以下显示数值
         If SelectedPoint IsNot Nothing Then
@@ -369,6 +377,18 @@ lblFail:
                 ElseIf tcmd = "mouth" Then
                     Call OpenReadingText()
                     Call Paint()
+                ElseIf tcmd = "cards" Then
+                    Call CardsTogether()
+                    Call Paint()
+                ElseIf tcmd = "cardse" Then
+                    Call CardsExplode()
+                    Call Paint()
+                ElseIf tcmd = "getqua" Then
+                    PostMsg("rx=" & CType(SelectedPoint, BonePoint).GetQuaternion(BonePoint.QuaParam.QX))
+                    PostMsg("ry=" & CType(SelectedPoint, BonePoint).GetQuaternion(BonePoint.QuaParam.QY))
+                    PostMsg("rz=" & CType(SelectedPoint, BonePoint).GetQuaternion(BonePoint.QuaParam.QZ))
+                    PostMsg("rw=" & CType(SelectedPoint, BonePoint).GetQuaternion(BonePoint.QuaParam.QW))
+
 
                 Else
                     PostMsg("未知指令")
@@ -396,9 +416,18 @@ lblFail:
                     Else
                         PostMsg("未选中任何点")
                     End If
-                ElseIf tcmd = "nd" Then
+                ElseIf tcmd = "normaldist" Then
                     Dim tv As Double = CDbl(tst(1))
                     PostMsg(CND(tv))
+                ElseIf tcmd = "bonelist" Then
+                    ShowingBone = tst(1)
+                    Call Paint()
+                ElseIf tcmd = "cardsb" Then
+                    Call CardsBounce(GetCardsPos, CSng(tst(1)))
+                    Call Paint()
+
+                Else
+
                 End If
 
             ElseIf tst.Length = 3 Then
@@ -728,7 +757,7 @@ lblFail:
                         For j = 0 To 4
                             Dim p1 As New FacePoint(pointer, 0)
                             ListFace(j).AddPoint(p1)
-                            Dim p2 As New FacePoint(pointer + seveneight - 1, 0)
+                            Dim p2 As New FacePoint(pointer + 14, 0)
                             ListFace(j).AddPoint(p2)
                         Next
                     ElseIf tpy.Special <> SpecialPinyin.None Then
@@ -892,8 +921,12 @@ lblFail:
                         PostMsg(progresscount & " / " & ListPY.Count)
                         Application.DoEvents()
                     End If
-                    pointer += seveneight
-                    seveneight = 15 - seveneight
+                    If tpy.isPause Then
+                        pointer += 15
+                    Else
+                        pointer += seveneight
+                        seveneight = 15 - seveneight
+                    End If
                 Next
             End If
 
@@ -913,6 +946,149 @@ lblFail:
             Dim p1 As New FacePoint(tf, tv)
             ListFace(tvo).AddPoint(p1)
         End If
+
+    End Sub
+
+    Public Sub CardsTogether()
+
+        Dim poslist(53) As Short    '54张牌
+        Dim ordlist As New List(Of Short)
+        For i = 0 To 53
+            ordlist.Add(i)
+        Next
+        Dim ran As New Random
+        For i = 0 To 53
+            Dim ti As Short = ran.Next(0, 54 - i)
+            poslist(i) = ordlist(ti)
+            ordlist.RemoveAt(ti)
+        Next
+
+        For i = 0 To 4
+            For j = 0 To 12
+                If i * 13 + j >= 54 Then
+                    Exit For
+                End If
+                Dim tb As Bone = ListBone(i * 13 + j)
+                Dim p1 As New BonePoint()
+                p1.Frame = 0
+                p1.Init(2.45 * j, 0.03 * poslist(i * 13 + j), -3.8 * i, 0, 0, 0, 0)
+                tb.AddPoint(p1)
+            Next
+        Next
+
+
+    End Sub
+
+    Public Function GetCardsPos() As Short()
+        Dim r(53) As Short
+        For i = 0 To 53
+            Dim tb As Bone = ListBone(i)
+            Dim tp As BonePoint = tb.PointList(0)
+            r(i) = tp.Y / 0.03
+        Next
+        Return r
+    End Function
+
+    Public Sub CardsBounce(poslist() As Short, v0mid As Single)
+
+        Dim g As Single = 10
+        Dim ran As New Random
+
+
+        For i = 0 To 4
+            For j = 0 To 12
+                If i * 13 + j >= 54 Then
+                    Exit For
+                End If
+                Dim tb As Bone = ListBone(i * 13 + j)
+
+                Dim tx As Single = 0.001 * ran.Next(-54 + poslist(i * 13 + j), 54 - poslist(i * 13 + j))
+                Dim tz As Single = 0.001 * ran.Next(-54 + poslist(i * 13 + j), 54 - poslist(i * 13 + j))
+                Dim tyv As Single = -(v0mid + 0.003 * (27 - poslist(i * 13 + j)))
+                Dim slow As Single = 0.05
+                For k = 1 To 30
+                    Dim tv As Vector3
+                    If k <= 8 Then
+                        tyv += g / 30
+                        tv = New Vector3(tx, tyv, tz)
+                    Else    '时间变慢
+                        tyv += g * slow / 30
+                        tv = New Vector3(slow * tx, slow * tyv, slow * tz)
+                    End If
+
+                    Dim tp As BonePoint = tb.PointList(k - 1).Copy
+                    tp.Frame = k
+                    tp.DeltaPos(tv)
+                    tb.AddPoint(tp)
+                Next
+
+            Next
+        Next
+
+
+    End Sub
+
+    Public Sub CardsExplode()
+
+        Dim ran As New Random
+
+        For i = 0 To 4
+            For j = 0 To 12
+                If i * 13 + j >= 54 Then
+                    Exit For
+                End If
+                Dim tb As Bone = ListBone(i * 13 + j)
+
+                Dim rx As Single = ran.NextDouble() * 2 * PI - PI
+                Dim ry As Single = ran.NextDouble() * 2 * PI - PI
+                Dim rz As Single = ran.NextDouble() * 2 * PI - PI
+                Dim v0 As Single = 6
+
+                Dim vec0 As VectorF4 = tb.PointList(0).QuaToV4
+
+                Dim rvmax As Single = 30
+                Dim rxv As Single = ran.NextDouble * 2 * rvmax - rvmax
+                Dim ryv As Single = ran.NextDouble * 2 * rvmax - rvmax
+                Dim rzv As Single = ran.NextDouble * 2 * rvmax - rvmax
+                Dim deltasample As New BonePoint
+                With deltasample
+                    .SX = rxv
+                    .SY = ryv
+                    .SZ = rzv
+                End With
+
+                Dim vec1 As VectorF4 = deltasample.QuaToV4
+
+                Dim slow As Single = 0.006
+                Dim v2 As Single = 1
+                For k = 1 To 30
+                    Dim tv As Vector3
+                    Dim v1 As Single = 0
+
+                    If k <= 4 Then
+                        v1 = v0
+                        v2 += 1
+                    Else    '时间变慢
+                        v1 = v0 * slow
+                        v2 += slow
+                    End If
+                    Dim dx As Single = v1 * Cos(ry) * Sin(rz)
+                    Dim dy As Single = v1 * Cos(rx) * Cos(rz)
+                    Dim dz As Single = v1 * Sin(rx) * Cos(ry)
+
+                    tv = New Vector3(dx, -dy, dz)
+                    Dim tp As BonePoint = tb.PointList(k - 1).Copy
+                    tp.Frame = k
+                    tp.DeltaPos(tv)
+
+                    Dim vec2 As VectorF4 = ReverseSlerp(vec0, vec1, v2)
+                    tp.SetQuaternion(vec2)
+                    tb.AddPoint(tp)
+                Next
+
+            Next
+        Next
+
 
     End Sub
 

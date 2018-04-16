@@ -83,6 +83,7 @@ Module MPinyin
 
     Public Sub LoadText(text As String)
 
+        ListPY.Clear()
         Dim tst() As String = Regex.Split(text, " ")
         If tst.Length Then
             For i = 0 To tst.Length - 1
