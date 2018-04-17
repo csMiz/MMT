@@ -388,7 +388,9 @@ lblFail:
                     PostMsg("ry=" & CType(SelectedPoint, BonePoint).GetQuaternion(BonePoint.QuaParam.QY))
                     PostMsg("rz=" & CType(SelectedPoint, BonePoint).GetQuaternion(BonePoint.QuaParam.QZ))
                     PostMsg("rw=" & CType(SelectedPoint, BonePoint).GetQuaternion(BonePoint.QuaParam.QW))
-
+                ElseIf tcmd = "bezier" Then
+                    Call GenerateBez()
+                    Call Paint()
 
                 Else
                     PostMsg("未知指令")
@@ -461,11 +463,30 @@ lblFail:
                 Dim tcmd As String = tst(0)
                 If tcmd = "single" Then
                     PostMsg(BitConverter.ToSingle(Receive4Bytes(tst(1), tst(2), tst(3), tst(4)), 0).ToString)
+                ElseIf tcmd = "bezier" Then
+                    Dim plist As New List(Of PointF)
+                    With plist
+                        .Add(New PointF(CSng(tst(1)), CSng(tst(2))))
+                        .Add(New PointF(CSng(tst(3)), CSng(tst(4))))
+                        .Add(New PointF(0, 0))
+                        .Add(New PointF(1, 1))
+                    End With
+
+                    Call GenerateBez(plist)
+                    Call Paint()
+
                 End If
             Else
+                Dim tcmd As String = tst(0)
+                If tcmd = "???" Then
+
+                Else
                     PostMsg("未知指令")
+                End If
+
+
             End If
-        End If
+            End If
 
     End Sub
 
@@ -1091,6 +1112,42 @@ lblFail:
 
 
     End Sub
+
+    Public Overloads Sub GenerateBez()
+        Dim pcount As Short = ListBone(0).GetPointCount
+        Dim framecount As Integer = ListBone(0).PointList(pcount - 1).Frame
+        Dim plist As New List(Of PointF3)
+        For Each tp As BonePoint In ListBone(0).PointList
+            Dim tvec As PointF3 = tp.PosToP3
+            plist.Add(tvec)
+        Next
+        For i = 1 To framecount - 1
+            Dim posvalue As PointF3 = Bezier(plist, i / framecount)
+            Dim tp As New BonePoint
+            tp.SetPos(posvalue)
+            tp.Frame = i
+            ListBone(0).AddPoint(tp)
+        Next
+    End Sub
+
+    Public Overloads Sub GenerateBez(tween As List(Of PointF))
+        Dim pcount As Short = ListBone(0).GetPointCount
+        Dim framecount As Integer = ListBone(0).PointList(pcount - 1).Frame
+        Dim plist As New List(Of PointF3)
+        For Each tp As BonePoint In ListBone(0).PointList
+            Dim tvec As PointF3 = tp.PosToP3
+            plist.Add(tvec)
+        Next
+        For i = 1 To framecount - 1
+            Dim posvalue As PointF3 = Bezier(plist, Bezier(tween, i / framecount).Y)
+            Dim tp As New BonePoint
+            tp.SetPos(posvalue)
+            tp.Frame = i
+            ListBone(0).AddPoint(tp)
+        Next
+
+    End Sub
+
 
 End Class
 

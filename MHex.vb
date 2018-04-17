@@ -96,13 +96,24 @@ Module mMath
     End Class
 
     Public Function Bezier(pCont As List(Of PointF3), t As Double) As PointF3
-        If Not pCont.Count Then Return Nothing
+        If pCont.Count = 0 Then Return Nothing
         Dim r As New PointF3
         Dim n As Short = pCont.Count - 1
         For i = 0 To n
             r.X += PascalT(n, i) * pCont(i).X * (1 - t) ^ (n - i) * t ^ i
             r.Y += PascalT(n, i) * pCont(i).Y * (1 - t) ^ (n - i) * t ^ i
             r.Z += PascalT(n, i) * pCont(i).Z * (1 - t) ^ (n - i) * t ^ i
+        Next
+        Return r
+    End Function
+
+    Public Function Bezier(pCont As List(Of PointF), t As Double) As PointF
+        If pCont.Count = 0 Then Return Nothing
+        Dim r As New PointF
+        Dim n As Short = pCont.Count - 1
+        For i = 0 To n
+            r.X += PascalT(n, i) * pCont(i).X * (1 - t) ^ (n - i) * t ^ i
+            r.Y += PascalT(n, i) * pCont(i).Y * (1 - t) ^ (n - i) * t ^ i
         Next
         Return r
     End Function
@@ -444,6 +455,10 @@ Module mMMD
 
         End Property
 
+        Public Sub New()
+            Call DefaultTween()
+        End Sub
+
         Public Overloads Function GetQuaternion(param As QuaParam) As Single
             Select Case param
                 Case QuaParam.QX
@@ -546,8 +561,24 @@ Module mMMD
 
         End Sub
 
+        Public Sub SetPos(tp As PointF3)
+            X = tp.X
+            Y = tp.Y
+            Z = tp.Z
+        End Sub
+
         Public Function QuaToV4() As VectorF4
             Dim r As New VectorF4(RW, RX, RY, RZ)
+            Return r
+        End Function
+
+        Public Function PosToV3() As Vector3
+            Dim r As New Vector3(X, Y, Z)
+            Return r
+        End Function
+
+        Public Function PosToP3() As PointF3
+            Dim r As New PointF3(X, Y, Z)
             Return r
         End Function
 
