@@ -93,6 +93,32 @@ Module mMath
             Y = ty
             Z = tz
         End Sub
+
+        Public Sub Move(v As Vector3)
+            X += v.X
+            Y += v.Y
+            Z += v.Z
+        End Sub
+    End Class
+
+    Public Class BezierPenPoint
+        Public StartPoint As PointF3
+        Public ArmPoint1 As PointF3
+        Public ReadOnly ArmPoint2 As PointF3
+
+        Public Sub New(SP As PointF3, AP1 As PointF3)
+            StartPoint = SP
+            ArmPoint1 = AP1
+
+            Dim ap2 As New PointF3
+            With ap2
+                .X = SP.X * 2 - AP1.X
+                .Y = SP.Y * 2 - AP1.Y
+                .Z = SP.Z * 2 - AP1.Z
+            End With
+            ArmPoint1 = ap2
+        End Sub
+
     End Class
 
     Public Function Bezier(pCont As List(Of PointF3), t As Double) As PointF3
@@ -104,6 +130,53 @@ Module mMath
             r.Y += PascalT(n, i) * pCont(i).Y * (1 - t) ^ (n - i) * t ^ i
             r.Z += PascalT(n, i) * pCont(i).Z * (1 - t) ^ (n - i) * t ^ i
         Next
+        Return r
+    End Function
+
+    Public Function Bezier(pCont As List(Of BezierPenPoint), t As Double) As PointF3
+        If pCont.Count = 0 Then Return Nothing
+
+        Dim listlen As New List(Of Single)
+        For i = 0 To pCont.Count - 2
+            Dim tbpp1 As BezierPenPoint = pCont(i)
+            Dim tbpp2 As BezierPenPoint = pCont(i + 1)
+            Dim tl As Single = 0
+            tl += CalcDist(tbpp1.StartPoint, tbpp1.ArmPoint2)
+            tl += CalcDist(tbpp1.ArmPoint2, tbpp2.ArmPoint1)
+            tl += CalcDist(tbpp2.ArmPoint1, tbpp2.StartPoint)
+            listlen.Add(tl)
+        Next
+
+        Dim listlen2 As New List(Of Double)
+        Dim tacc As Double = 0
+        Dim tsum As Double = listlen.Sum
+        For i = 0 To listlen.Count - 1
+            tacc += listlen(i) / tsum
+            listlen2.Add(tacc)
+        Next
+
+        Dim lineindex As Short = 0
+        Dim t2 As Double = 0
+        For i = 0 To listlen2.Count - 1
+            If t <= listlen2(i) Then
+                lineindex = i
+                If i = 0 Then
+                    t2 = t / listlen2(i)
+                Else
+                    t2 = (t - listlen2(i - 1)) / (listlen2(i) - listlen2(i - 1))
+                End If
+                Exit For
+            End If
+        Next
+
+        Dim r As New PointF3
+        Dim cont2 As New List(Of PointF3)
+        cont2.Add(pCont(lineindex).StartPoint)
+        cont2.Add(pCont(lineindex).ArmPoint2)
+        cont2.Add(pCont(lineindex + 1).ArmPoint1)
+        cont2.Add(pCont(lineindex + 1).StartPoint)
+        r = Bezier(cont2, t2)
+
         Return r
     End Function
 
@@ -198,6 +271,16 @@ Module mMath
         Return result
     End Function
 
+    Public Function CalcDist(pa As PointF3, pb As PointF3) As Single
+        Dim r As Double = 0
+        r = ((pa.X - pb.X) ^ 2 + (pa.Y - pb.Y) ^ 2 + (pa.Z - pb.Z) ^ 2) ^ 0.5
+        Return CSng(r)
+    End Function
+
+    Public Function Helix(a As Single) As PointF
+        'Dim r As New PointF
+
+    End Function
 
 End Module
 

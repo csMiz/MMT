@@ -391,6 +391,9 @@ lblFail:
                 ElseIf tcmd = "bezier" Then
                     Call GenerateBez()
                     Call Paint()
+                ElseIf tcmd = "cardsd" Then
+                    Call CardsDisperse(GetCardsPos)
+                    Call Paint()
 
                 Else
                     PostMsg("未知指令")
@@ -426,6 +429,9 @@ lblFail:
                     Call Paint()
                 ElseIf tcmd = "cardsb" Then
                     Call CardsBounce(GetCardsPos, CSng(tst(1)))
+                    Call Paint()
+                ElseIf tcmd = "cardsc" Then
+                    Call CardsCollect(CInt(tst(1)))
                     Call Paint()
 
                 Else
@@ -992,7 +998,7 @@ lblFail:
                 Dim tb As Bone = ListBone(i * 13 + j)
                 Dim p1 As New BonePoint()
                 p1.Frame = 0
-                p1.Init(2.45 * j, 0.03 * poslist(i * 13 + j), -3.8 * i, 0, 0, 0, 0)
+                p1.Init(1.225 * j, 0.015 * poslist(i * 13 + j), -1.9 * i, 0, 0, 0, 0)
                 tb.AddPoint(p1)
             Next
         Next
@@ -1005,7 +1011,7 @@ lblFail:
         For i = 0 To 53
             Dim tb As Bone = ListBone(i)
             Dim tp As BonePoint = tb.PointList(0)
-            r(i) = tp.Y / 0.03
+            r(i) = tp.Y / 0.015
         Next
         Return r
     End Function
@@ -1147,6 +1153,130 @@ lblFail:
         Next
 
     End Sub
+
+    Public Sub CardsDisperse(poslist As Short())
+        Dim po As PointF3 = ListBone(0).PointList(0).PosToP3
+        For i = 0 To 29
+            For j = 0 To 53
+                If poslist(j) < i Then
+                    Dim tp As New BonePoint
+                    tp.Frame = i
+                    tp.SetPos(po)
+                    tp.X += 2 * poslist(j)
+                    ListBone(j).AddPoint(tp)
+                Else
+                    Dim tp As New BonePoint
+                    tp.Frame = i
+                    tp.SetPos(po)
+                    tp.X += 2 * i
+                    ListBone(j).AddPoint(tp)
+                End If
+            Next
+        Next
+
+    End Sub
+
+    Public Sub CardsFlip(pat As Short)  '0-r 1-head 2-tail
+        If pat = 0 Then
+            'NA
+        ElseIf pat = 1 Then
+            For i = 0 To 53
+                Dim tp As BonePoint = ListBone(i).PointList(0).Copy
+                tp.Frame = 1
+                tp.SZ = 180
+                ListBone(i).AddPoint(tp)
+            Next
+        Else
+            For i = 0 To 53
+                Dim tp As BonePoint = ListBone(i).PointList(0).Copy
+                tp.Frame = 1
+                tp.SZ = 0
+                ListBone(i).AddPoint(tp)
+            Next
+        End If
+    End Sub
+
+    Private Sub CardsCollect(pointcount As Short)
+        Dim track As New List(Of List(Of BezierPenPoint))
+        Dim tracktween As New List(Of List(Of PointF))
+
+        For i = 0 To 3
+            Dim tracksublist As New List(Of BezierPenPoint)
+            For j = 0 To pointcount - 1 Step 2
+                Dim trackp1 As PointF3 = ListBone(i).PointList(j).PosToP3
+                Dim trackp2 As PointF3 = ListBone(i).PointList(j + 1).PosToP3
+                Dim trackp As New BezierPenPoint(trackp2, trackp1)
+                tracksublist.Add(trackp)
+
+            Next
+            track.Add(tracksublist)
+            Dim tracksubtween As New List(Of PointF)
+            tracksubtween.Add(New PointF(0, 0))
+            tracksubtween.Add(New PointF(0.5, 0.05))
+            tracksubtween.Add(New PointF(0.5, 0.95))
+            tracksubtween.Add(New PointF(1, 1))
+            tracktween.Add(tracksubtween)
+        Next
+
+
+        Dim trackcount As Short = track.Count
+        Dim weightlist As New List(Of Double)
+
+        For k = 0 To 53
+            For i = 1 To 90
+                Dim distlist As New List(Of Single)
+                Dim nearestpoint As New PointF3
+                For j = 0 To trackcount - 1
+                    Dim tp As PointF3 = Bezier(track(j), Bezier(tracktween(j), i / 90).Y)
+                    Dim tdis As Single = CalcDist(ListBone(k).PointList(i - 1).PosToP3, tp)
+                    If distlist.Count Then
+                        If tdis < distlist.Min Then
+                            nearestpoint = tp
+                        End If
+                    Else
+                        nearestpoint = tp
+                    End If
+                    distlist.Add(tdis)
+                Next
+                Dim sumdist As Single = distlist.Sum
+                Dim trackdelta As New List(Of Vector3)
+                For j = 0 To trackcount - 1
+                    Dim tdv As New Vector3
+                    With tdv
+                        .X = Bezier(track(j), Bezier(tracktween(j), i / 90).Y).X - Bezier(track(j), Bezier(tracktween(j), (i - 1) / 90).Y).X
+                        .Y = Bezier(track(j), Bezier(tracktween(j), i / 90).Y).Y - Bezier(track(j), Bezier(tracktween(j), (i - 1) / 90).Y).Y
+                        .Z = Bezier(track(j), Bezier(tracktween(j), i / 90).Y).Z - Bezier(track(j), Bezier(tracktween(j), (i - 1) / 90).Y).Z
+                    End With
+                    trackdelta.Add(tdv)
+                Next
+                Dim rp As New Vector3
+                For j = 0 To trackcount - 1
+                    rp.X += trackdelta(j).X * distlist(j) / sumdist
+                    rp.Y += trackdelta(j).Y * distlist(j) / sumdist
+                    rp.Z += trackdelta(j).Z * distlist(j) / sumdist
+                Next
+                Dim tpo As PointF3 = ListBone(k).PointList(i - 1).PosToP3
+                tpo.Move(rp)
+
+                Dim rbp As BonePoint = ListBone(k).PointList(i - 1).Copy
+                With rbp
+                    .Frame = i
+                    .SetPos(tpo)
+                    Dim tpdesti As PointF3 = .PosToP3
+                    Dim tpdr As New PointF3
+                    tpdr.X = tpdesti.X * (8100 - i ^ 2) / 8100 + nearestpoint.X * (i ^ 2 / 8100)
+                    tpdr.Y = tpdesti.Y * (8100 - i ^ 2) / 8100 + nearestpoint.Y * (i ^ 2 / 8100)
+                    tpdr.Z = tpdesti.Z * (8100 - i ^ 2) / 8100 + nearestpoint.Z * (i ^ 2 / 8100)
+                    .SetPos(tpdr)
+
+                End With
+                ListBone(k).AddPoint(rbp)
+
+            Next
+        Next
+
+    End Sub
+
 
 
 End Class
