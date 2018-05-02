@@ -394,6 +394,9 @@ lblFail:
                 ElseIf tcmd = "cardsd" Then
                     Call CardsDisperse(GetCardsPos)
                     Call Paint()
+                ElseIf tcmd = "stopcheck" Then
+                    Dim a = ListBone
+
 
                 Else
                     PostMsg("未知指令")
@@ -401,25 +404,34 @@ lblFail:
             ElseIf tst.Length = 2 Then
                 Dim tcmd As String = tst(0)
                 If tcmd.Contains("set") Then
-                    If SelectedPoint IsNot Nothing Then
-                        If tcmd = "setx" Then
-                            CType(SelectedPoint, BonePoint).X = CSng(tst(1))
-                        ElseIf tcmd = "sety" Then
-                            CType(SelectedPoint, BonePoint).Y = CSng(tst(1))
-                        ElseIf tcmd = "setz" Then
-                            CType(SelectedPoint, BonePoint).Z = CSng(tst(1))
-                        ElseIf tcmd = "setrx" Then
-                            CType(SelectedPoint, BonePoint).SX = CSng(tst(1))
-                        ElseIf tcmd = "setry" Then
-                            CType(SelectedPoint, BonePoint).SY = CSng(tst(1))
-                        ElseIf tcmd = "setrz" Then
-                            CType(SelectedPoint, BonePoint).SZ = CSng(tst(1))
-                        ElseIf tcmd = "setv" Then
-                            CType(SelectedPoint, FacePoint).V = CSng(tst(1))
+                    If tcmd.Contains("all") Then
+                        If tcmd = "setally" Then
+                            For i = 0 To ListBone(0).GetPointCount - 1
+                                ListBone(0).PointList(i).SY = CSng(tst(1))
+                            Next
                         End If
                         Call Paint()
                     Else
-                        PostMsg("未选中任何点")
+                        If SelectedPoint IsNot Nothing Then
+                            If tcmd = "setx" Then
+                                CType(SelectedPoint, BonePoint).X = CSng(tst(1))
+                            ElseIf tcmd = "sety" Then
+                                CType(SelectedPoint, BonePoint).Y = CSng(tst(1))
+                            ElseIf tcmd = "setz" Then
+                                CType(SelectedPoint, BonePoint).Z = CSng(tst(1))
+                            ElseIf tcmd = "setrx" Then
+                                CType(SelectedPoint, BonePoint).SX = CSng(tst(1))
+                            ElseIf tcmd = "setry" Then
+                                CType(SelectedPoint, BonePoint).SY = CSng(tst(1))
+                            ElseIf tcmd = "setrz" Then
+                                CType(SelectedPoint, BonePoint).SZ = CSng(tst(1))
+                            ElseIf tcmd = "setv" Then
+                                CType(SelectedPoint, FacePoint).V = CSng(tst(1))
+                            End If
+                            Call Paint()
+                        Else
+                            PostMsg("未选中任何点")
+                        End If
                     End If
                 ElseIf tcmd = "normaldist" Then
                     Dim tv As Double = CDbl(tst(1))
@@ -432,6 +444,9 @@ lblFail:
                     Call Paint()
                 ElseIf tcmd = "cardsc" Then
                     Call CardsCollect(CInt(tst(1)))
+                    Call Paint()
+                ElseIf tcmd = "bezier" Then
+                    Call GenerateBez(0, CInt(tst(1)))
                     Call Paint()
 
                 Else
@@ -479,6 +494,9 @@ lblFail:
                     End With
 
                     Call GenerateBez(plist)
+                    Call Paint()
+                ElseIf tcmd = "cardsf" Then
+                    Call CardsFix(New PointF3(CSng(tst(1)), CSng(tst(2)), CSng(tst(3))), CSng(tst(4)))
                     Call Paint()
 
                 End If
@@ -650,7 +668,7 @@ lblFail:
                 tp.Frame = frame
                 tp.Init(px, py, pz, rx, ry, rz, rw)
                 tp.SetTween(tween)
-                hasbone.PointList.Add(tp)
+                hasbone.AddPoint(tp)
 
             Next
         End If
@@ -686,7 +704,7 @@ lblFail:
                 tp.Frame = frame
                 tp.Init(tv)
                 '表情无补间
-                hasface.PointList.Add(tp)
+                hasface.AddPoint(tp)
 
             Next
         End If
@@ -1031,9 +1049,9 @@ lblFail:
 
                 Dim tx As Single = 0.001 * ran.Next(-54 + poslist(i * 13 + j), 54 - poslist(i * 13 + j))
                 Dim tz As Single = 0.001 * ran.Next(-54 + poslist(i * 13 + j), 54 - poslist(i * 13 + j))
-                Dim tyv As Single = -(v0mid + 0.003 * (27 - poslist(i * 13 + j)))
+                Dim tyv As Single = -(v0mid + 0.0015 * (27 - poslist(i * 13 + j)))
                 Dim slow As Single = 0.05
-                For k = 1 To 30
+                For k = 1 To 89
                     Dim tv As Vector3
                     If k <= 8 Then
                         tyv += g / 30
@@ -1074,9 +1092,9 @@ lblFail:
                 Dim vec0 As VectorF4 = tb.PointList(0).QuaToV4
 
                 Dim rvmax As Single = 30
-                Dim rxv As Single = ran.NextDouble * 2 * rvmax - rvmax
-                Dim ryv As Single = ran.NextDouble * 2 * rvmax - rvmax
-                Dim rzv As Single = ran.NextDouble * 2 * rvmax - rvmax
+                Dim rxv As Single = ran.NextDouble() * 2 * rvmax - rvmax
+                Dim ryv As Single = ran.NextDouble() * 2 * rvmax - rvmax
+                Dim rzv As Single = ran.NextDouble() * 2 * rvmax - rvmax
                 Dim deltasample As New BonePoint
                 With deltasample
                     .SX = rxv
@@ -1154,6 +1172,85 @@ lblFail:
 
     End Sub
 
+    Public Overloads Sub GenerateBez(bezpentweentype As Short, lastframe As Integer)
+        '匀速运动
+        SortPoint()
+
+        Dim distsum As Single = 0
+        Dim bpplist As New List(Of BezierPenPoint)
+
+        For i = 0 To ListBone(0).GetPointCount - 1 Step 2
+            Dim tp1 As PointF3 = ListBone(0).PointList(i).PosToP3
+            Dim tp2 As PointF3 = ListBone(0).PointList(i + 1).PosToP3
+            Dim tbp As New BezierPenPoint(tp2, tp1)
+            bpplist.Add(tbp)
+        Next
+
+        Dim poskvp As New List(Of KeyValuePair(Of Integer, Single))
+        Dim lastpoint As PointF3 = Nothing
+        Dim accudist As Single = 0
+        For i = 0 To bpplist.Count - 2
+            For j = 0 To 99
+                Dim posvalue As PointF3 = Bezier(bpplist, CInt(i * 100 + j))
+                If lastpoint IsNot Nothing Then
+                    Dim deltadist As Single = CalcDist(posvalue, lastpoint)
+                    accudist += deltadist
+                End If
+                lastpoint = posvalue.Copy
+                poskvp.Add(New KeyValuePair(Of Integer, Single)(i * 100 + j, accudist))
+            Next
+        Next
+        distsum = accudist
+
+        For i = 0 To lastframe
+            Dim tdist As Single = distsum * i / lastframe
+            'then, search for the kvp position
+
+            Dim tre2 As Integer = -1
+            'binary search
+            Dim tre As Integer = -1
+            Dim ub As Integer = poskvp.Count - 1
+            Dim lb As Integer = 0
+            Dim mid As Integer = 0
+
+            While (lb <= ub)
+                If (ub = lb + 1) Then
+                    tre = lb
+                    Exit While
+                End If
+                mid = (lb + ub) / 2
+                Dim tv As Single = poskvp(mid).Value
+                If (tv = tdist) Then
+                    tre = mid
+                    Exit While
+                ElseIf (tdist > tv) Then
+                    lb = mid
+                Else
+                    ub = mid
+                End If
+            End While
+
+            If tre = poskvp.Count - 1 Then
+                tre2 = tre
+            Else
+                If poskvp(tre).Value - tdist <= tdist - poskvp(tre + 1).Value Then
+                    tre2 = tre + 1
+                Else
+                    tre2 = tre
+                End If
+            End If
+
+            Dim slidevalue As Integer = poskvp(tre2).Key
+
+            Dim posvalue2 As PointF3 = Bezier(bpplist, slidevalue)
+            Dim tp As New BonePoint
+            tp.SetPos(posvalue2)
+            tp.Frame = i
+            ListBone(0).AddPoint(tp)
+        Next
+
+    End Sub
+
     Public Sub CardsDisperse(poslist As Short())
         Dim po As PointF3 = ListBone(0).PointList(0).PosToP3
         For i = 0 To 29
@@ -1200,7 +1297,7 @@ lblFail:
         Dim track As New List(Of List(Of BezierPenPoint))
         Dim tracktween As New List(Of List(Of PointF))
 
-        For i = 0 To 3
+        For i = 0 To 2
             Dim tracksublist As New List(Of BezierPenPoint)
             For j = 0 To pointcount - 1 Step 2
                 Dim trackp1 As PointF3 = ListBone(i).PointList(j).PosToP3
@@ -1236,6 +1333,14 @@ lblFail:
                     Else
                         nearestpoint = tp
                     End If
+                    Dim ki = k \ 13
+                    Dim kj = k Mod 13
+                    With nearestpoint
+                        .X += 1.225 * kj
+                        .Y += 0
+                        .Z += -1.9 * ki
+                    End With
+
                     distlist.Add(tdis)
                 Next
                 Dim sumdist As Single = distlist.Sum
@@ -1264,9 +1369,9 @@ lblFail:
                     .SetPos(tpo)
                     Dim tpdesti As PointF3 = .PosToP3
                     Dim tpdr As New PointF3
-                    tpdr.X = tpdesti.X * (8100 - i ^ 2) / 8100 + nearestpoint.X * (i ^ 2 / 8100)
-                    tpdr.Y = tpdesti.Y * (8100 - i ^ 2) / 8100 + nearestpoint.Y * (i ^ 2 / 8100)
-                    tpdr.Z = tpdesti.Z * (8100 - i ^ 2) / 8100 + nearestpoint.Z * (i ^ 2 / 8100)
+                    tpdr.X = tpdesti.X * (90 - i) / 90 + nearestpoint.X * (i / 90)
+                    tpdr.Y = tpdesti.Y * (90 - i) / 90 + nearestpoint.Y * (i / 90)
+                    tpdr.Z = tpdesti.Z * (90 - i) / 90 + nearestpoint.Z * (i / 90)
                     .SetPos(tpdr)
 
                 End With
@@ -1276,6 +1381,44 @@ lblFail:
         Next
 
     End Sub
+
+    Private Sub CardsFix(pcentre As PointF3, pr As Single)
+        Dim ran As New Random
+        For i = 0 To 53
+            Dim rx As Single = ran.NextDouble() * 2 * PI - PI
+            Dim ry As Single = ran.NextDouble() * 2 * PI - PI
+            Dim rz As Single = ran.NextDouble() * 2 * PI - PI
+
+            Dim dx As Single = pr * Cos(ry) * Sin(rz)
+            Dim dy As Single = pr * Cos(rx) * Cos(rz)
+            Dim dz As Single = pr * Sin(rx) * Cos(ry)
+            For j = 0 To 90
+
+                Dim po As PointF3 = ListBone(i).PointList(j).PosToP3
+                Dim tp As New PointF3
+                With tp
+                    .X = po.X * (90 - j) / 90 + (dx + pcentre.X) * j / 90
+                    .Y = po.Y * (90 - j) / 90 + (dy + pcentre.Y) * j / 90
+                    .Z = po.Z * (90 - j) / 90 + (dz + pcentre.Z) * j / 90
+                End With
+
+                Dim ki = i \ 13
+                Dim kj = i Mod 13
+                With tp
+                    .X += 1.225 * kj
+                    .Y += 0
+                    .Z += -1.9 * ki
+                End With
+
+                ListBone(i).PointList(j).SetPos(tp)
+            Next
+        Next
+
+
+
+    End Sub
+
+
 
 
 

@@ -5,6 +5,10 @@ Imports Miz_MMD_Tool
 Module mMath
     Private NDTable As New List(Of PointF)
 
+    Public Interface iPointEx
+        Function Copy() As iPointEx
+    End Interface
+
     Public Sub InitNDTable()
         For i = -400 To 399
             Dim tx As Double = i / 100
@@ -86,6 +90,7 @@ Module mMath
     End Class
 
     Public Class PointF3
+        Implements iPointEx
         Public X As Single = 0, Y As Single = 0, Z As Single = 0
 
         Public Sub New(Optional tx As Single = 0, Optional ty As Single = 0, Optional tz As Single = 0)
@@ -99,6 +104,11 @@ Module mMath
             Y += v.Y
             Z += v.Z
         End Sub
+
+        Public Function Copy() As iPointEx Implements iPointEx.Copy
+            Dim r As New PointF3(X, Y, Z)
+            Return r
+        End Function
     End Class
 
     Public Class BezierPenPoint
@@ -116,7 +126,7 @@ Module mMath
                 .Y = SP.Y * 2 - AP1.Y
                 .Z = SP.Z * 2 - AP1.Z
             End With
-            ArmPoint1 = ap2
+            ArmPoint2 = ap2
         End Sub
 
     End Class
@@ -180,6 +190,23 @@ Module mMath
         Return r
     End Function
 
+    Public Function Bezier(pCont As List(Of BezierPenPoint), slides As Integer) As PointF3
+        If pCont.Count = 0 Then Return Nothing
+
+        Dim linenumber As Integer = slides \ 100
+        Dim slidenumber As Double = (slides Mod 100) / 100
+
+        Dim r As New PointF3
+        Dim cont2 As New List(Of PointF3)
+        cont2.Add(pCont(linenumber).StartPoint)
+        cont2.Add(pCont(linenumber).ArmPoint2)
+        cont2.Add(pCont(linenumber + 1).ArmPoint1)
+        cont2.Add(pCont(linenumber + 1).StartPoint)
+        r = Bezier(cont2, slidenumber)
+
+        Return r
+    End Function
+
     Public Function Bezier(pCont As List(Of PointF), t As Double) As PointF
         If pCont.Count = 0 Then Return Nothing
         Dim r As New PointF
@@ -217,6 +244,9 @@ Module mMath
 
     Public Function Slerp(V1 As VectorF4, V2 As VectorF4, t As Double) As VectorF4
         Dim result As New VectorF4
+        'If V1.X = 0 AndAlso V1.Y = 0 AndAlso V1.Z = 0 AndAlso V1.W = 0 Then
+        '    V1.W = 1
+        'End If
         Dim cosa As Single = V1.W * V2.W + V1.X * V2.X + V1.Y * V2.Y + V1.Z * V2.Z
 
         If (cosa < 0.0F) Then
@@ -250,6 +280,10 @@ Module mMath
     Public Function ReverseSlerp(V1 As VectorF4, V2 As VectorF4, t As Single) As VectorF4
 
         Dim result As New VectorF4
+        '如何解决四个值均为0的情况？
+        'If V1.X = 0 AndAlso V1.Y = 0 AndAlso V1.Z = 0 AndAlso V1.W = 0 Then
+        '    V1.W = 1
+        'End If
         Dim cosa As Single = V1.W * V2.W + V1.X * V2.X + V1.Y * V2.Y + V1.Z * V2.Z
         Dim k0 As Single, k1 As Single
         Dim sina As Single = (1.0F - cosa * cosa) ^ 0.5
