@@ -10,10 +10,7 @@ Public Class Form1
     Public LastDeltaFrame As Short = 0
     Public UsingFileName As String = ""
     Public UsingFileURI As String = ""
-    Public VMDStorage As List(Of String)
-    Private ModelName As String = ""
-    Private ListBone As List(Of Bone)
-    Private ListFace As List(Of Face)
+
     Private SelectedPoint As MMDPoint = Nothing
     Public SelectedPointBone As Integer = -1
     Private ClipBoard As MMDPoint
@@ -21,10 +18,19 @@ Public Class Form1
     Public ShowingFrame As Integer = 0
     Public ShowingBone As Integer = 0
 
+    Public ExeMode As eExeMode = eExeMode.None
+
     Public Enum SaveFileParam As Byte
         SaveNew = 0
         VMDTest = 1
         Save = 2
+
+    End Enum
+
+    Public Enum eExeMode As Byte
+        None = 0
+        VMD = 1
+        PMX = 2
 
     End Enum
 
@@ -166,6 +172,7 @@ Public Class Form1
             ListBone.Clear()
             ListFace.Clear()
 
+            ExeMode = eExeMode.VMD
             Call ReadVMD()
 
             Call Paint()
@@ -203,80 +210,7 @@ Public Class Form1
             Dim r As BinaryWriter = New BinaryWriter(tstream)
             PostMsg("开始写入" & UsingFileName)
 
-            r.Write(VMDHeadBytes())
-            Dim omodelname As Byte() = CharToBytes(ModelName)
-            Dim tmn(19) As Byte
-            For i = 0 To 19
-                tmn(i) = omodelname(i)
-            Next
-            r.Write(tmn)
-            '骨骼
-            Dim bpcount As Integer = 0
-            If ListBone.Count Then
-                For i = 0 To ListBone.Count - 1
-                    bpcount += ListBone(i).GetPointCount
-                Next
-            End If
-            r.Write(BitConverter.GetBytes(bpcount))
-            If ListBone.Count Then
-                For i = 0 To ListBone.Count - 1
-                    If Not ListBone(i).IsEmpty Then
-                        For j = 0 To ListBone(i).GetPointCount - 1
-                            Dim tp As BonePoint = ListBone(i).PointList(j)
-
-                            Dim obonename As Byte() = CharToBytes(ListBone(i).Name)
-                            Dim tbn(14) As Byte
-                            For k = 0 To 14
-                                tbn(k) = obonename(k)
-                            Next
-                            r.Write(tbn)
-                            r.Write(BitConverter.GetBytes(tp.Frame))
-                            r.Write(BitConverter.GetBytes(tp.X))
-                            r.Write(BitConverter.GetBytes(tp.Y))
-                            r.Write(BitConverter.GetBytes(tp.Z))
-                            r.Write(BitConverter.GetBytes(tp.GetQuaternion(BonePoint.QuaParam.QX)))
-                            r.Write(BitConverter.GetBytes(tp.GetQuaternion(BonePoint.QuaParam.QY)))
-                            r.Write(BitConverter.GetBytes(tp.GetQuaternion(BonePoint.QuaParam.QZ)))
-                            r.Write(BitConverter.GetBytes(tp.GetQuaternion(BonePoint.QuaParam.QW)))
-                            r.Write(tp.GetTweenBytes())
-
-                        Next
-                    End If
-                Next
-            End If
-            '表情
-            Dim fpcount As Integer = 0
-            If ListFace.Count Then
-                For i = 0 To ListFace.Count - 1
-                    fpcount += ListFace(i).GetPointCount
-                Next
-            End If
-            r.Write(BitConverter.GetBytes(fpcount))
-            If ListFace.Count Then
-                For i = 0 To ListFace.Count - 1
-                    If Not ListFace(i).IsEmpty Then
-                        For j = 0 To ListFace(i).GetPointCount - 1
-                            Dim tp As FacePoint = ListFace(i).PointList(j)
-
-                            Dim ofacename As Byte() = CharToBytes(ListFace(i).Name)
-                            Dim tfn(14) As Byte
-                            For k = 0 To 14
-                                tfn(k) = ofacename(k)
-                            Next
-                            r.Write(tfn)
-                            r.Write(BitConverter.GetBytes(tp.Frame))
-                            r.Write(BitConverter.GetBytes(tp.V))
-
-                        Next
-                    End If
-                Next
-            End If
-
-            Dim tempty(15) As Byte
-            For i = 0 To 15
-                tempty(i) = 0
-            Next
-            r.Write(tempty)
+            Call WriteVMD(r)
 
             r.Close()
             tstream.Close()
@@ -374,6 +308,9 @@ lblFail:
                     SelectedPoint = Nothing
                 ElseIf tcmd = "cls" Then
                     TB1.Text = ""
+                ElseIf tcmd = "py" Then
+                    Call LoadPinyinConfig()
+                    Call Paint()
                 ElseIf tcmd = "mouth" Then
                     Call OpenReadingText()
                     Call Paint()
@@ -394,8 +331,9 @@ lblFail:
                 ElseIf tcmd = "cardsd" Then
                     Call CardsDisperse(GetCardsPos)
                     Call Paint()
-                ElseIf tcmd = "stopcheck" Then
-                    Dim a = ListBone
+                ElseIf tcmd = "sinewave" Then
+                    Call SinWaveMove()
+                    Call Paint()
 
 
                 Else
@@ -613,105 +551,6 @@ lblFail:
         Return (a.Frame - b.Frame)
     End Function
 
-    Private Sub ReadVMD()
-        '此部分仅对骨骼和表情分析，摄像机的读取方式与此不同
-
-        '0-29是文件头，不处理
-        '30-49是模型名称
-        ModelName = GetBytes(VMDStorage, 30, 20)
-        ModelName = ModelName.Trim(vbNullChar)
-        '50-53数据块数
-        Dim bonedatacount As Integer = BitConverter.ToInt32(StringTo4Bytes(GetBytes(VMDStorage, 50, 4)), 0)
-
-        '读数据块
-        Dim pointer As Integer = 54
-        If bonedatacount Then
-            For i = 0 To bonedatacount - 1
-                Dim bonename As String = GetBytes(VMDStorage, pointer, 15)
-                bonename = bonename.Trim(vbNullChar)
-                pointer += 15
-                Dim frame As Integer = BitConverter.ToInt32(StringTo4Bytes(GetBytes(VMDStorage, pointer, 4)), 0)
-                pointer += 4
-                Dim px As Single = BitConverter.ToSingle(StringTo4Bytes(GetBytes(VMDStorage, pointer, 4)), 0)
-                pointer += 4
-                Dim py As Single = BitConverter.ToSingle(StringTo4Bytes(GetBytes(VMDStorage, pointer, 4)), 0)
-                pointer += 4
-                Dim pz As Single = BitConverter.ToSingle(StringTo4Bytes(GetBytes(VMDStorage, pointer, 4)), 0)
-                pointer += 4
-                Dim rx As Single = BitConverter.ToSingle(StringTo4Bytes(GetBytes(VMDStorage, pointer, 4)), 0)
-                pointer += 4
-                Dim ry As Single = BitConverter.ToSingle(StringTo4Bytes(GetBytes(VMDStorage, pointer, 4)), 0)
-                pointer += 4
-                Dim rz As Single = BitConverter.ToSingle(StringTo4Bytes(GetBytes(VMDStorage, pointer, 4)), 0)
-                pointer += 4
-                Dim rw As Single = BitConverter.ToSingle(StringTo4Bytes(GetBytes(VMDStorage, pointer, 4)), 0)
-                pointer += 4
-                Dim tween As String = GetBytes(VMDStorage, pointer, 64)
-                pointer += 64
-
-                Dim hasbone As Bone = Nothing
-                For Each tb As Bone In ListBone
-                    If tb.Name = bonename Then
-                        hasbone = tb
-                        Exit For
-                    End If
-                Next
-
-                If hasbone Is Nothing Then
-                    Dim tb As New Bone
-                    tb.Name = bonename
-                    ListBone.Add(tb)
-                    hasbone = tb
-                End If
-
-                Dim tp As New BonePoint
-                tp.Frame = frame
-                tp.Init(px, py, pz, rx, ry, rz, rw)
-                tp.SetTween(tween)
-                hasbone.AddPoint(tp)
-
-            Next
-        End If
-
-        Dim facedatacount As Integer = BitConverter.ToInt32(StringTo4Bytes(GetBytes(VMDStorage, pointer, 4)), 0)
-        pointer += 4
-        If facedatacount Then
-            For i = 0 To facedatacount - 1
-                Dim facename As String = GetBytes(VMDStorage, pointer, 15)
-                facename = facename.Trim(vbNullChar)
-                pointer += 15
-                Dim frame As Integer = BitConverter.ToInt32(StringTo4Bytes(GetBytes(VMDStorage, pointer, 4)), 0)
-                pointer += 4
-                Dim tv As Single = BitConverter.ToSingle(StringTo4Bytes(GetBytes(VMDStorage, pointer, 4)), 0)
-                pointer += 4
-
-                Dim hasface As Face = Nothing
-                For Each tf As Face In ListFace
-                    If tf.Name = facename Then
-                        hasface = tf
-                        Exit For
-                    End If
-                Next
-
-                If hasface Is Nothing Then
-                    Dim tf As New Face
-                    tf.Name = facename
-                    ListFace.Add(tf)
-                    hasface = tf
-                End If
-
-                Dim tp As New FacePoint
-                tp.Frame = frame
-                tp.Init(tv)
-                '表情无补间
-                hasface.AddPoint(tp)
-
-            Next
-        End If
-
-
-    End Sub
-
     Public Sub ShakeAsPi(Interval As Short, Len As Integer)
         Dim pointer As Integer = 0
         Dim digitcount As Integer = 0
@@ -767,6 +606,9 @@ lblFail:
     End Sub
 
     Public Sub OpenReadingText()
+
+        'obsolete
+
         Dim openFile As New OpenFileDialog
         openFile.Filter = "拼音文档|*.txt"
         openFile.Title = "打开"
@@ -1414,13 +1256,34 @@ lblFail:
             Next
         Next
 
+    End Sub
 
+    Private Sub SinWaveMove(Optional amp As Single = 6, Optional omega As Single = 0.1)
+
+        Call SortPoint()
+        Dim maxframe As Integer = ListBone(0).GetPointCount - 1
+
+        Dim c As Single = ListBone(0).PointList(0).Y
+        'Dim amp As Single = Abs(ListBone(0).PointList(1).Y - c)
+        'Dim Tquater As Single = Abs(CalcDist(ListBone(0).PointList(0).PosToP3.GetXZ, ListBone(0).PointList(1).PosToP3.GetXZ))
+        'Dim omega As Single = PI / (2 * Tquater)
+
+        Dim ax As Single = 0
+        For i = 0 To maxframe
+            Dim tp As BonePoint = ListBone(0).PointList(i)
+            If i >= 1 Then
+                Dim dx As Single = CalcDist(tp.PosToP3.GetXZ, ListBone(0).PointList(i - 1).PosToP3.GetXZ)
+                ax += dx
+            End If
+            Dim ry As Single = amp * Sin(omega * ax) + c
+            tp.Y = ry
+
+        Next
 
     End Sub
 
+    Private Sub TB2_TextChanged(sender As Object, e As EventArgs) Handles TB2.TextChanged
 
-
-
-
+    End Sub
 End Class
 

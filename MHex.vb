@@ -109,6 +109,11 @@ Module mMath
             Dim r As New PointF3(X, Y, Z)
             Return r
         End Function
+
+        Public Function GetXZ() As PointF
+            Dim r As New PointF(X, Z)
+            Return r
+        End Function
     End Class
 
     Public Class BezierPenPoint
@@ -242,6 +247,16 @@ Module mMath
 
     End Class
 
+    Public Class Vector2
+        Public X As Single = 0, Y As Single = 0
+
+        Public Sub New(Optional tx As Single = 0, Optional ty As Single = 0)
+            X = tx
+            Y = ty
+        End Sub
+
+    End Class
+
     Public Function Slerp(V1 As VectorF4, V2 As VectorF4, t As Double) As VectorF4
         Dim result As New VectorF4
         'If V1.X = 0 AndAlso V1.Y = 0 AndAlso V1.Z = 0 AndAlso V1.W = 0 Then
@@ -309,6 +324,12 @@ Module mMath
         Dim r As Double = 0
         r = ((pa.X - pb.X) ^ 2 + (pa.Y - pb.Y) ^ 2 + (pa.Z - pb.Z) ^ 2) ^ 0.5
         Return CSng(r)
+    End Function
+
+    Public Function CalcDist(pa As PointF, pb As PointF) As Single
+        Dim r = 0
+        r = ((pa.X - pb.X) ^ 2 + (pa.Y - pb.Y) ^ 2) ^ 0.5
+        Return r
     End Function
 
     Public Function Helix(a As Single) As PointF
@@ -423,6 +444,54 @@ Module mHex
 
 End Module
 
+Module mMMDPhysics
+
+    Public Enum eColliderShape As Byte
+        Cube = 0
+        Sphere = 1
+        'Cuboid = 2
+    End Enum
+
+    Public Class PhysicsBone
+        Public BindingBone As Bone
+        Public LinkedSynthesis As CollideSynthesis
+
+        Public Sub New(tb As Bone)
+            BindingBone = tb
+        End Sub
+
+    End Class
+
+    Public Class Collider
+        Public Shape As eColliderShape = eColliderShape.Cube
+        Public Param As Single = 5
+        Public Mass As Single = 1
+
+        Public Sub New(tshape As eColliderShape, arg As Single, tmass As Single)
+            Shape = tshape
+            Param = arg
+            Mass = tmass
+        End Sub
+
+    End Class
+
+    Public Class CollideSynthesis
+        Public Bones As New List(Of PhysicsBone)
+        Public Colliders As New List(Of Collider)
+
+        Public Function IsValid() As Boolean
+            If Bones.Count > 0 AndAlso Colliders.Count > 0 Then Return True Else Return False
+        End Function
+
+    End Class
+
+
+    Public Function PhysicsBoneMove(tb As PhysicsBone, pos As BonePoint, dir As Vector3, vel As Single) As BonePoint
+
+    End Function
+
+End Module
+
 Module mMMD
 
     Public Class PointB
@@ -444,20 +513,6 @@ Module mMMD
         End Function
 
     End Class
-
-    Public Function VMDHeadBytes() As Byte()
-
-        Dim st As String = "56 6F 63 61 6C 6F 69 64 20 4D 6F 74 69 6F 6E 20 "
-        st = st & "44 61 74 61 20 30 30 30 32 00 00 00 00 00"
-
-        Dim o() As Byte = ReceiveBytes(st)
-        Dim r(29) As Byte
-        For i = 0 To 29
-            r(i) = o(i)
-        Next
-        Return r
-
-    End Function
 
     Public Interface MMDPoint
         Function Copy() As MMDPoint
