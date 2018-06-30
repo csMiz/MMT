@@ -1,9 +1,10 @@
 ﻿Imports System.IO
 Imports System.Text.RegularExpressions
 
-Module MPinyin
+Module mPinyin
 
     Public ListPY As New List(Of cPinyin)
+
 
     Public Enum CloseMouthParam As Byte
         None = 0
@@ -14,8 +15,9 @@ Module MPinyin
 
     Public Enum SpecialPinyin As Byte
         None = 0
-        ZhiChiShiRiZiCiSi = 1
-        Yu = 2
+        ZhiChiShiRi = 1
+        ZiCiSi = 2
+        Yu = 3
 
     End Enum
 
@@ -46,13 +48,13 @@ Module MPinyin
             If Pinyin.Contains("ie") Or Pinyin.Contains("ei") Or Pinyin.Contains("ue") Or Pinyin.Contains("ve") Or Pinyin.Contains("ye") Then
                 SingleE = False
             End If
-            If Pinyin.Contains("ian") Then
+            If Pinyin.Contains("ian") AndAlso Not Pinyin.Contains("iang") Then
                 ChangedA = True
             End If
             If Pinyin = "zhi" Or Pinyin = "chi" Or Pinyin = "shi" Or Pinyin = "ri" Then
-                Special = SpecialPinyin.ZhiChiShiRiZiCiSi
+                Special = SpecialPinyin.ZhiChiShiRi
             ElseIf Pinyin = "zi" Or Pinyin = "ci" Or Pinyin = "si" Then
-                Special = SpecialPinyin.ZhiChiShiRiZiCiSi
+                Special = SpecialPinyin.ZiCiSi
             ElseIf Pinyin = "yu" Then
                 Special = SpecialPinyin.Yu
             Else
@@ -85,10 +87,38 @@ Module MPinyin
     Public Class cWaveLable
         Public ID As Short   '0-4: a,i,u,e,o  5-7:wave1,2,3
         Public Value As New List(Of KeyValuePair(Of Single, Single))    'interval,value
+
+        Public Function Copy() As cWaveLable
+            Dim r As New cWaveLable
+            r.ID = ID
+            For Each c As KeyValuePair(Of Single, Single) In Value
+                r.Value.Add(New KeyValuePair(Of Single, Single)(c.Key, c.Value))
+            Next
+            Return r
+        End Function
+
+        Public Function Calc(X As Single) As Single
+            For i = 0 To Value.Count - 2
+                If X >= Value(i).Key AndAlso X < Value(i + 1).Key Then
+                    Dim k As Single = (Value(i + 1).Value - Value(i).Value) / (Value(i + 1).Key - (Value(i).Key))
+                    Dim r As Single = Value(i).Value + k * (X - Value(i).Key)
+                    Return r
+                End If
+            Next
+            Return 1
+        End Function
     End Class
 
     Public Class cPinyinConfigLabel
         Public Labels As New List(Of cWaveLable)
+
+        Public Function Copy() As cPinyinConfigLabel
+            Dim r As New cPinyinConfigLabel
+            For Each c As cWaveLable In Labels
+                r.Labels.Add(c.Copy)
+            Next
+            Return r
+        End Function
 
         Public Shared Function LoadFromText(inp As String) As cPinyinConfigLabel
 
@@ -146,6 +176,44 @@ Module MPinyin
             Return r
 
         End Function
+
+        Public Sub Write(faces As List(Of Face), Interval As Single, ByRef Startat As Integer, Optional wav As List(Of Byte) = Nothing)
+
+            If Labels.Count Then
+                For i = 0 To Labels.Count - 1
+                    Dim tl As cWaveLable = Labels(i)
+                    For j = 0 To tl.Value.Count - 1
+                        Dim tkvp As KeyValuePair(Of Single, Single) = tl.Value(j)
+                        Dim tx As Single = tkvp.Key * Interval
+                        Dim tvowel As Short = -1
+                        If wav Is Nothing Then
+                            tvowel = tl.ID
+                        Else
+                            tvowel = wav(tl.ID - 5)
+                        End If
+                        If Math.Abs(tx - CInt(tx)) < 0.05 Then
+                            Dim tfp As New FacePoint(Startat + CInt(tx), tkvp.Value)
+                            faces(tvowel).AddPoint(tfp)
+                        Else
+                            Dim tfp As New FacePoint(Startat + Math.Truncate(tx), tl.Calc(Math.Truncate(tx) / Interval))
+                            Dim tfp2 As New FacePoint(Startat + Math.Truncate(tx + 1), tl.Calc(Math.Truncate(tx + 1) / Interval))
+                            faces(tvowel).AddPoint(tfp)
+                            faces(tvowel).AddPoint(tfp2)
+                        End If
+
+                    Next
+                Next
+            End If
+            Startat += Interval
+        End Sub
+
+        Public Sub CloneLabel(sourceL As Short, copycount As Short)
+            For i = 1 To copycount
+                Labels.Insert(sourceL, Labels(sourceL).Copy)
+            Next
+
+        End Sub
+
     End Class
 
     Public Class cPinyinConfig
@@ -163,6 +231,93 @@ Module MPinyin
 
         Public Shared CloseMouthBef As Single
         Public Shared CloseMouthAft As Single
+
+        Public Shared Pointer As Integer = 0
+        Public Shared Interval As Single = 7.5
+
+        Public Shared usingIndex As Long = 0
+
+        Public Shared Sub ApplyPause(faces As List(Of Face))
+            Pause.Write(faces, Interval, Pointer)
+        End Sub
+        Public Shared Sub ApplyZhi(faces As List(Of Face))
+            Zhi.Write(faces, Interval, Pointer)
+        End Sub
+        Public Shared Sub ApplyZi(faces As List(Of Face))
+            Zi.Write(faces, Interval, Pointer)
+        End Sub
+        Public Shared Sub ApplyYu(faces As List(Of Face))
+            Yu.Write(faces, Interval, Pointer)
+        End Sub
+        Public Shared Sub ApplyNormal(faces As List(Of Face), tpy As cPinyin)
+            Dim tpycl As cPinyinConfigLabel = Nothing
+            Dim tvc As Short = tpy.Vowel.Count
+            If tvc = 1 Then
+                tpycl = Wav1.Copy
+            ElseIf tvc = 2 Then
+                tpycl = Wav2.Copy
+            ElseIf tvc = 3 Then
+                tpycl = Wav3.Copy
+            End If
+            For i = 0 To tvc - 1
+                tpycl.Labels(i).ID = tpy.Vowel(i)
+            Next
+            If tpy.SingleE Then
+                If tpycl.Labels(0).ID = 3 Then
+                    tpycl.CloneLabel(0, SingleE.Labels.Count - 1)
+                    For i = 0 To tpycl.Labels.Count - 1
+                        tpycl.Labels(i).ID = SingleE.Labels(i).ID
+                    Next
+                End If
+            ElseIf tpy.ChangedA Then
+                tpycl.Labels(1).ID = 3
+            End If
+            If tpy.CloseMouth = CloseMouthParam.Before Or tpy.CloseMouth = CloseMouthParam.Both Then
+                For i = 0 To tpycl.Labels.Count - 1
+                    For j = 0 To tpycl.Labels(i).Value.Count - 1
+                        Dim tokv As KeyValuePair(Of Single, Single) = tpycl.Labels(i).Value(j)
+                        tpycl.Labels(i).Value(j) = New KeyValuePair(Of Single, Single)(CloseMouthBef + tokv.Key * (1 - CloseMouthBef), tokv.Value)
+                        tokv = Nothing
+                    Next
+                    tpycl.Labels(i).Value.Insert(0, New KeyValuePair(Of Single, Single)(0.0F, 0.0F))
+                Next
+            End If
+            If tpy.CloseMouth = CloseMouthParam.SemiAfter Or tpy.CloseMouth = CloseMouthParam.Both Then
+                For i = 0 To tpycl.Labels.Count - 1
+                    For j = 0 To tpycl.Labels(i).Value.Count - 1
+                        Dim tokv As KeyValuePair(Of Single, Single) = tpycl.Labels(i).Value(j)
+                        If tokv.Key > CloseMouthAft Then
+                            tpycl.Labels(i).Value(j) = New KeyValuePair(Of Single, Single)(tokv.Key, tokv.Value * 0.5)
+                        End If
+                        tokv = Nothing
+                    Next
+                Next
+            End If
+
+            tpycl.Write(faces, Interval, Pointer)
+
+
+        End Sub
+
+        Public Shared Sub ApplySinglePinyin(faces As List(Of Face), interval As Short)
+
+            Dim tpy As cPinyin = ListPY(usingIndex)
+            cPinyinConfig.Interval = interval
+            If tpy.isPause Then
+                cPinyinConfig.ApplyPause(ListFace)
+            ElseIf tpy.Special = SpecialPinyin.ZhiChiShiRi Then
+                cPinyinConfig.ApplyZhi(ListFace)
+            ElseIf tpy.Special = SpecialPinyin.ZiCiSi Then
+                cPinyinConfig.ApplyZi(ListFace)
+            ElseIf tpy.Special = SpecialPinyin.Yu Then
+                cPinyinConfig.ApplyYu(ListFace)
+            ElseIf tpy.Special = SpecialPinyin.None Then
+                cPinyinConfig.ApplyNormal(ListFace, tpy)
+            End If
+            usingIndex += 1
+            If usingIndex >= ListPY.Count Then usingIndex = -1
+
+        End Sub
 
     End Class
 
@@ -192,6 +347,12 @@ Module MPinyin
         'analyse
         '//(interval,value)
 
+        Dim mc0 As MatchCollection = Regex.Matches(configtext, "<!--(.[\s\S]+?)-->")
+        If mc0.Count > 0 Then
+            For i = 0 To mc0.Count - 1
+                configtext.Replace("<!--" & mc0(i).Groups(1).Value & "-->", "")
+            Next
+        End If
         Dim mc1 As MatchCollection = Regex.Matches(configtext, "<(.[\s\S]+?)>(.[\s\S]+?)</")
         If mc1.Count > 0 Then
             For i = 0 To mc1.Count - 1

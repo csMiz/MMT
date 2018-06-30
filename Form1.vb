@@ -31,6 +31,7 @@ Public Class Form1
         None = 0
         VMD = 1
         PMX = 2
+        PinyinManual = 3
 
     End Enum
 
@@ -54,6 +55,21 @@ Public Class Form1
         Dim bm As New Bitmap(1000, 750)
         Dim G As Graphics = Graphics.FromImage(bm)
         G.Clear(Color.White)
+
+        'If ExeMode = eExeMode.VMDandWAV Then
+        '    '(100,5)-(900,260)显示波形
+        '    '(100,260)-(900,350)显示时间
+        '    '(100,660)-(900,450)显示注音
+        '    Dim splist As List(Of Byte) = wavefile.GetSampleImage(800)
+        '    For i = 0 To 799
+        '        G.DrawLine(Pens.Gray, 100 + i, 260 - splist(i), 100 + i, 132)
+        '    Next
+        'End If
+
+        'If ExeMode = eExeMode.PinyinManual Then
+        '    '(100,50)-(900,100)显示帧
+        '    '(100,120)-(900,240)显示拼音
+        'End If
 
         '左边200显示名称，上面50显示帧
         For i = 0 To 39
@@ -276,7 +292,7 @@ lblFail:
             TB2.Text = ""
             Dim tst() As String = Regex.Split(tin, " ")
             If tst.Length = 1 Then
-                Dim tcmd As String = tst(0)
+                Dim tcmd As String = tst(0).ToLower
                 If tcmd = "open" Then
                     Call OpenFile()
                 ElseIf tcmd = "test" Then
@@ -310,10 +326,17 @@ lblFail:
                     TB1.Text = ""
                 ElseIf tcmd = "py" Then
                     Call LoadPinyinConfig()
+                    Call ApplyPinyin(7.5)
                     Call Paint()
+                ElseIf tcmd = "pysingle" Then
+                    ExeMode = eExeMode.PinyinManual
+                    Call LoadPinyinConfig()
+                    Call ApplyPinyin()
+                    PostMsg("下一个：" & ListPY(0).Pinyin)
                 ElseIf tcmd = "mouth" Then
-                    Call OpenReadingText()
-                    Call Paint()
+                    PostMsg("obsolete function.")
+                    'Call OpenReadingText()
+                    'Call Paint()
                 ElseIf tcmd = "cards" Then
                     Call CardsTogether()
                     Call Paint()
@@ -386,7 +409,21 @@ lblFail:
                 ElseIf tcmd = "bezier" Then
                     Call GenerateBez(0, CInt(tst(1)))
                     Call Paint()
-
+                ElseIf tcmd = "py" Then
+                    If ExeMode = eExeMode.PinyinManual Then
+                        Call cPinyinConfig.ApplySinglePinyin(ListFace, CInt(tst(1)))
+                        Call Paint()
+                        If cPinyinConfig.usingIndex <> -1 Then
+                            PostMsg("下一个：" & ListPY(cPinyinConfig.usingIndex).Pinyin)
+                        Else
+                            PostMsg("结束")
+                        End If
+                        Call Paint()
+                    Else
+                            Call LoadPinyinConfig()
+                        Call ApplyPinyin(CSng(tst(1)))
+                        Call Paint()
+                    End If
                 Else
 
                 End If
@@ -605,6 +642,86 @@ lblFail:
 
     End Sub
 
+    Public Overloads Sub ApplyPinyin(Interval As Single)
+
+        Dim openFile As New OpenFileDialog
+        openFile.Filter = "拼音文档|*.txt"
+        openFile.Title = "打开"
+        openFile.AddExtension = True
+        openFile.AutoUpgradeEnabled = True
+        If openFile.ShowDialog() = DialogResult.OK Then
+            Dim tstr As FileStream = CType(openFile.OpenFile, FileStream)
+            Dim r As StreamReader = New StreamReader(tstr)
+            PostMsg("正在读取拼音")
+
+            Dim pytext As String = ""
+            pytext = r.ReadToEnd
+            r.Close()
+            tstr.Dispose()
+
+            PostMsg("正在分析拼音")
+
+            Call LoadText(pytext)
+
+            PostMsg("共读取" & ListPY.Count & "个")
+            PostMsg("正在转换为口型")
+            Application.DoEvents()
+
+            If ListPY.Count > 0 Then
+                cPinyinConfig.Interval = Interval
+                For i = 0 To ListPY.Count - 1
+                    Dim tpy As cPinyin = ListPY(i)
+                    If tpy.isPause Then
+                        cPinyinConfig.ApplyPause(ListFace)
+                    ElseIf tpy.Special = SpecialPinyin.ZhiChiShiRi Then
+                        cPinyinConfig.ApplyZhi(ListFace)
+                    ElseIf tpy.Special = SpecialPinyin.ZiCiSi Then
+                        cPinyinConfig.ApplyZi(ListFace)
+                    ElseIf tpy.Special = SpecialPinyin.Yu Then
+                        cPinyinConfig.ApplyYu(ListFace)
+                    ElseIf tpy.Special = SpecialPinyin.None Then
+                        cPinyinConfig.ApplyNormal(ListFace, tpy)
+                    End If
+
+                    If cPinyinConfig.Pointer Mod 100 = 0 Then
+                        PostMsg(cPinyinConfig.Pointer & " / " & ListPY.Count)
+                        Application.DoEvents()
+                    End If
+                Next
+            End If
+
+            PostMsg("完成")
+        End If
+
+
+
+    End Sub
+
+    Public Overloads Sub ApplyPinyin()
+        Dim openFile As New OpenFileDialog
+        openFile.Filter = "拼音文档|*.txt"
+        openFile.Title = "打开"
+        openFile.AddExtension = True
+        openFile.AutoUpgradeEnabled = True
+        If openFile.ShowDialog() = DialogResult.OK Then
+            Dim tstr As FileStream = CType(openFile.OpenFile, FileStream)
+            Dim r As StreamReader = New StreamReader(tstr)
+            PostMsg("正在读取拼音")
+
+            Dim pytext As String = ""
+            pytext = r.ReadToEnd
+            r.Close()
+            tstr.Dispose()
+
+            PostMsg("正在分析拼音")
+
+            Call LoadText(pytext)
+
+            PostMsg("共读取" & ListPY.Count & "个")
+        End If
+
+    End Sub
+
     Public Sub OpenReadingText()
 
         'obsolete
@@ -648,7 +765,8 @@ lblFail:
                             ListFace(j).AddPoint(p2)
                         Next
                     ElseIf tpy.Special <> SpecialPinyin.None Then
-                        If tpy.Special = SpecialPinyin.ZhiChiShiRiZiCiSi Then
+                        'If tpy.Special = SpecialPinyin.ZhiChiShiRiZiCiSi Then
+                        If tpy.Special = SpecialPinyin.ZhiChiShiRi Then
                             Dim tk() As Short = {0, 1, 2, -1}
                             Dim tv() As Single = {0.15, 0.3, 0.5, 0.5}
                             For j = 0 To tk.Count - 1
