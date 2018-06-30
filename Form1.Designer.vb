@@ -22,6 +22,7 @@ Partial Class Form1
     '不要使用代码编辑器修改它。
     <System.Diagnostics.DebuggerStepThrough()> _
     Private Sub InitializeComponent()
+        Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(Form1))
         Me.P = New System.Windows.Forms.PictureBox()
         Me.TB1 = New System.Windows.Forms.TextBox()
         Me.TB2 = New System.Windows.Forms.TextBox()
@@ -44,6 +45,7 @@ Partial Class Form1
         Me.TB1.Multiline = True
         Me.TB1.Name = "TB1"
         Me.TB1.ReadOnly = True
+        Me.TB1.ScrollBars = System.Windows.Forms.ScrollBars.Vertical
         Me.TB1.Size = New System.Drawing.Size(527, 697)
         Me.TB1.TabIndex = 2
         '
@@ -64,6 +66,7 @@ Partial Class Form1
         Me.Controls.Add(Me.TB2)
         Me.Controls.Add(Me.TB1)
         Me.Controls.Add(Me.P)
+        Me.Icon = CType(resources.GetObject("$this.Icon"), System.Drawing.Icon)
         Me.Name = "Form1"
         Me.Text = "Miz MMD Tool"
         CType(Me.P, System.ComponentModel.ISupportInitialize).EndInit()

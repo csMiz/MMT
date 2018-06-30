@@ -683,8 +683,8 @@ lblFail:
                         cPinyinConfig.ApplyNormal(ListFace, tpy)
                     End If
 
-                    If cPinyinConfig.Pointer Mod 100 = 0 Then
-                        PostMsg(cPinyinConfig.Pointer & " / " & ListPY.Count)
+                    If cPinyinConfig.Pointer Mod 200 = 0 Then
+                        PostMsg((cPinyinConfig.Pointer \ Interval) & " / " & ListPY.Count)
                         Application.DoEvents()
                     End If
                 Next
