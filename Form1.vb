@@ -18,24 +18,7 @@ Public Class Form1
     Public ShowingFrame As Integer = 0
     Public ShowingBone As Integer = 0
 
-    Public ExeMode As eExeMode = eExeMode.None
-
-    Public Enum SaveFileParam As Byte
-        SaveNew = 0
-        VMDTest = 1
-        Save = 2
-
-    End Enum
-
-    Public Enum eExeMode As Byte
-        None = 0
-        VMD = 1
-        PMX = 2
-        PinyinManual = 3
-
-    End Enum
-
-    Public tFont As Font
+    Private ExeMode As eExeMode = eExeMode.None
 
     Private Function GetBoneFace(Index As Short) As MMDBoneFace
 
@@ -83,7 +66,7 @@ Public Class Form1
                 tp.Width = 3
 
                 G.DrawLine(tp, 200 + 20 * (i - ShowingFrame + 19), 50, 200 + 20 * (i - ShowingFrame + 19), 750)
-                G.DrawString(i.ToString, tFont, Brushes.Black, 200 + 20 * (i - ShowingFrame + 19) - 10, 15)
+                G.DrawString(i.ToString, DefaultFont, Brushes.Black, 200 + 20 * (i - ShowingFrame + 19) - 10, 15)
             End If
         Next
 
@@ -93,7 +76,7 @@ Public Class Form1
             If tboneface IsNot Nothing Then
                 If TypeOf tboneface Is Bone Then
                     Dim tbone As Bone = CType(tboneface, Bone)
-                    G.DrawString(tbone.Name, tFont, Brushes.DarkBlue, 5, 55 + i * 50)
+                    G.DrawString(tbone.Name, DefaultFont, Brushes.DarkBlue, 5, 55 + i * 50)
                     For j = 0 To tbone.GetPointCount - 1
                         Dim tf As Integer = tbone.PointList(j).Frame - ShowingFrame
                         If tf >= -19 AndAlso tf <= 20 Then
@@ -105,7 +88,7 @@ Public Class Form1
                     Next
                 Else
                     Dim tface As Face = CType(tboneface, Face)
-                    G.DrawString(tface.Name, tFont, Brushes.DarkGreen, 5, 55 + i * 50)
+                    G.DrawString(tface.Name, DefaultFont, Brushes.DarkGreen, 5, 55 + i * 50)
                     For j = 0 To tface.GetPointCount - 1
                         Dim tf As Integer = tface.PointList(j).Frame - ShowingFrame
                         If tf >= -19 AndAlso tf <= 20 Then
@@ -124,16 +107,16 @@ Public Class Form1
         If SelectedPoint IsNot Nothing Then
             G.FillRectangle(Brushes.LightGray, 0, 700, 1000, 50)
             If TypeOf SelectedPoint Is BonePoint Then
-                G.DrawString("X=" & CType(SelectedPoint, BonePoint).X.ToString, tFont, Brushes.Black, 5, 715)
-                G.DrawString("Y=" & CType(SelectedPoint, BonePoint).Y.ToString, tFont, Brushes.Black, 155, 705)
-                G.DrawString("Z=" & CType(SelectedPoint, BonePoint).Z.ToString, tFont, Brushes.Black, 305, 715)
+                G.DrawString("X=" & CType(SelectedPoint, BonePoint).X.ToString, DefaultFont, Brushes.Black, 5, 715)
+                G.DrawString("Y=" & CType(SelectedPoint, BonePoint).Y.ToString, DefaultFont, Brushes.Black, 155, 705)
+                G.DrawString("Z=" & CType(SelectedPoint, BonePoint).Z.ToString, DefaultFont, Brushes.Black, 305, 715)
                 '显示欧拉角
-                G.DrawString("RX=" & CType(SelectedPoint, BonePoint).SX.ToString, tFont, Brushes.Black, 455, 705)
-                G.DrawString("RY=" & CType(SelectedPoint, BonePoint).SY.ToString, tFont, Brushes.Black, 605, 715)
-                G.DrawString("RZ=" & CType(SelectedPoint, BonePoint).SZ.ToString, tFont, Brushes.Black, 755, 705)
+                G.DrawString("RX=" & CType(SelectedPoint, BonePoint).SX.ToString, DefaultFont, Brushes.Black, 455, 705)
+                G.DrawString("RY=" & CType(SelectedPoint, BonePoint).SY.ToString, DefaultFont, Brushes.Black, 605, 715)
+                G.DrawString("RZ=" & CType(SelectedPoint, BonePoint).SZ.ToString, DefaultFont, Brushes.Black, 755, 705)
 
             Else
-                G.DrawString("V=" & CType(SelectedPoint, FacePoint).V.ToString, tFont, Brushes.Black, 5, 715)
+                G.DrawString("V=" & CType(SelectedPoint, FacePoint).V.ToString, DefaultFont, Brushes.Black, 5, 715)
 
             End If
         End If
@@ -199,7 +182,7 @@ Public Class Form1
 
     End Sub
 
-    Public Sub SaveNewFile(Optional param As SaveFileParam = SaveFileParam.SaveNew)
+    Private Sub SaveNewFile(Optional param As SaveFileParam = SaveFileParam.SaveNew)
         Dim tstream As FileStream = Nothing
         If param = SaveFileParam.SaveNew Then
             Dim saveFile As New SaveFileDialog
@@ -279,7 +262,6 @@ lblFail:
         ListBone = New List(Of Bone)
         ListFace = New List(Of Face)
 
-        tFont = New Font("Microsoft YaHei", 18)
         Call InitNDTable()
 
     End Sub
