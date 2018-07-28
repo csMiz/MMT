@@ -1,18 +1,21 @@
 ﻿Module mConstant
-    Public ReadOnly DefaultFont As Font = New Font("Microsoft YaHei", 18)
+    Public ReadOnly DEFAULT_FONT As Font = New Font("Microsoft YaHei", 18)
+
+
 
     Public Enum SaveFileParam As Byte
-        SaveNew = 0
-        VMDTest = 1
-        Save = 2
+        SAVENEW = 0
+        VMDTEST = 1
+        SAVE = 2
 
     End Enum
 
     Public Enum eExeMode As Byte
-        None = 0
+        NONE = 0
         VMD = 1
         PMX = 2
-        PinyinManual = 3
+        PINYIN_MANUAL = 3
+        WAV = 4
 
     End Enum
 End Module

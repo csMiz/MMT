@@ -39,20 +39,12 @@ Public Class Form1
         Dim G As Graphics = Graphics.FromImage(bm)
         G.Clear(Color.White)
 
-        'If ExeMode = eExeMode.VMDandWAV Then
-        '    '(100,5)-(900,260)显示波形
-        '    '(100,260)-(900,350)显示时间
-        '    '(100,660)-(900,450)显示注音
-        '    Dim splist As List(Of Byte) = wavefile.GetSampleImage(800)
-        '    For i = 0 To 799
-        '        G.DrawLine(Pens.Gray, 100 + i, 260 - splist(i), 100 + i, 132)
-        '    Next
-        'End If
+        If ExeMode = eExeMode.WAV Then
 
-        'If ExeMode = eExeMode.PinyinManual Then
-        '    '(100,50)-(900,100)显示帧
-        '    '(100,120)-(900,240)显示拼音
-        'End If
+            WavControlBar.DrawBar(G)
+            PaintWavMap(G)
+
+        End If
 
         '左边200显示名称，上面50显示帧
         For i = 0 To 39
@@ -266,6 +258,11 @@ lblFail:
 
     End Sub
 
+    ''' <summary>
+    ''' 所有功能
+    ''' </summary>
+    ''' <param name="sender"></param>
+    ''' <param name="e"></param>
     Private Sub TB2_KeyPress(sender As Object, e As KeyPressEventArgs) Handles TB2.KeyPress
 
         If e.KeyChar = ChrW(13) Then
@@ -311,7 +308,7 @@ lblFail:
                     Call ApplyPinyin(7.5)
                     Call Paint()
                 ElseIf tcmd = "pysingle" Then
-                    ExeMode = eExeMode.PinyinManual
+                    ExeMode = eExeMode.PINYIN_MANUAL
                     Call LoadPinyinConfig()
                     Call ApplyPinyin()
                     PostMsg("下一个：" & ListPY(0).Pinyin)
@@ -339,7 +336,10 @@ lblFail:
                 ElseIf tcmd = "sinewave" Then
                     Call SinWaveMove()
                     Call Paint()
-
+                ElseIf tcmd = "wav" Then
+                    Call LoadWavFile()
+                    ExeMode = eExeMode.WAV
+                    Call Paint()
 
                 Else
                     PostMsg("未知指令")
@@ -392,7 +392,7 @@ lblFail:
                     Call GenerateBez(0, CInt(tst(1)))
                     Call Paint()
                 ElseIf tcmd = "py" Then
-                    If ExeMode = eExeMode.PinyinManual Then
+                    If ExeMode = eExeMode.PINYIN_MANUAL Then
                         Call cPinyinConfig.ApplySinglePinyin(ListFace, CInt(tst(1)))
                         Call Paint()
                         If cPinyinConfig.usingIndex <> -1 Then
@@ -402,7 +402,7 @@ lblFail:
                         End If
                         Call Paint()
                     Else
-                            Call LoadPinyinConfig()
+                        Call LoadPinyinConfig()
                         Call ApplyPinyin(CSng(tst(1)))
                         Call Paint()
                     End If
@@ -472,63 +472,73 @@ lblFail:
     End Sub
 
     Private Sub P_MouseDown(sender As Object, e As MouseEventArgs) Handles P.MouseDown
-        If e.Button = MouseButtons.Left Then
-            If SelectedPoint IsNot Nothing AndAlso e.Y >= 350 Then
-                If TypeOf SelectedPoint Is BonePoint Then
-                    Dim skey As Short = CShort((e.X - 3) \ 50)
-                    Select Case skey
-                        Case 0
-                            TB2.Text = "setx " & CType(SelectedPoint, BonePoint).X
-                        Case 1
-                            TB2.Text = "sety " & CType(SelectedPoint, BonePoint).Y
-                        Case 2
-                            TB2.Text = "setz " & CType(SelectedPoint, BonePoint).Z
-                        Case 3
-                            TB2.Text = "setrx " & CType(SelectedPoint, BonePoint).SX
-                        Case 4
-                            TB2.Text = "setry " & CType(SelectedPoint, BonePoint).SY
-                        Case 5
-                            TB2.Text = "setrz " & CType(SelectedPoint, BonePoint).SZ
-
-                    End Select
-
-                Else
-
-                    TB2.Text = "setv " & CType(SelectedPoint, FacePoint).V
-
-                End If
-
-            Else
-                StartX = e.X
+        If ExeMode = eExeMode.WAV Then
+            If WavControlBar.JudgeHit(e) Then
                 MouseFlag = True
+                StartX = e.X
             End If
-
-        ElseIf e.Button = MouseButtons.Right Then
-            Dim sb As Integer = (e.Y - 25) \ 25
-            Dim sf As Integer = ShowingFrame + CInt(Math.Ceiling((e.X - 285) / 10) - 1)
-            SelectedPoint = FindPoint(sb, sf)
-            SelectedPointBone = sb
-            Call Paint()
+        Else
+            If e.Button = MouseButtons.Left Then
+                If SelectedPoint IsNot Nothing AndAlso e.Y >= 350 Then
+                    If TypeOf SelectedPoint Is BonePoint Then
+                        Dim skey As Short = CShort((e.X - 3) \ 50)
+                        Select Case skey
+                            Case 0
+                                TB2.Text = "setx " & CType(SelectedPoint, BonePoint).X
+                            Case 1
+                                TB2.Text = "sety " & CType(SelectedPoint, BonePoint).Y
+                            Case 2
+                                TB2.Text = "setz " & CType(SelectedPoint, BonePoint).Z
+                            Case 3
+                                TB2.Text = "setrx " & CType(SelectedPoint, BonePoint).SX
+                            Case 4
+                                TB2.Text = "setry " & CType(SelectedPoint, BonePoint).SY
+                            Case 5
+                                TB2.Text = "setrz " & CType(SelectedPoint, BonePoint).SZ
+                        End Select
+                    Else
+                        TB2.Text = "setv " & CType(SelectedPoint, FacePoint).V
+                    End If
+                Else
+                    StartX = e.X
+                    MouseFlag = True
+                End If
+            ElseIf e.Button = MouseButtons.Right Then
+                Dim sb As Integer = (e.Y - 25) \ 25
+                Dim sf As Integer = ShowingFrame + CInt(Math.Ceiling((e.X - 285) / 10) - 1)
+                SelectedPoint = FindPoint(sb, sf)
+                SelectedPointBone = sb
+                Call Paint()
+            End If
         End If
+
 
     End Sub
 
     Private Sub P_MouseUp(sender As Object, e As MouseEventArgs) Handles P.MouseUp
+        If ExeMode = eExeMode.WAV Then
+            WavControlBar.MouseHitState = WavScreenController.EMouseHitState.NONE
+        End If
         LastDeltaFrame = 0
         MouseFlag = False
 
     End Sub
 
     Private Sub P_MouseMove(sender As Object, e As MouseEventArgs) Handles P.MouseMove
+
         If MouseFlag Then
-            Dim deltaframe As Short = CShort((StartX - e.X) \ 10)
-            If deltaframe <> LastDeltaFrame Then
-                ShowingFrame += (deltaframe - LastDeltaFrame)
+            If ExeMode = eExeMode.WAV Then
+                Dim delta As Single = -StartX + e.X
+                WavControlBar.MouseMove(delta)
                 Call Paint()
+            Else
+                Dim deltaframe As Short = CShort((StartX - e.X) \ 10)
+                If deltaframe <> LastDeltaFrame Then
+                    ShowingFrame += (deltaframe - LastDeltaFrame)
+                    Call Paint()
+                End If
+                LastDeltaFrame = deltaframe
             End If
-
-            LastDeltaFrame = deltaframe
-
         End If
 
     End Sub
@@ -1385,5 +1395,6 @@ lblFail:
     Private Sub TB2_TextChanged(sender As Object, e As EventArgs) Handles TB2.TextChanged
 
     End Sub
+
 End Class
 
