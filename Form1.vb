@@ -43,76 +43,80 @@ Public Class Form1
 
             WavControlBar.DrawBar(G)
             PaintWavMap(G)
+            PaintPYBlocks(G)
+            PaintWavUIGrid(G)
 
-        End If
+        ElseIf ExeMode = eExeMode.VMD OrElse ExeMode = eExeMode.NONE Then
 
-        '左边200显示名称，上面50显示帧
-        For i = 0 To 39
-            G.DrawLine(Pens.Gray, 200 + 20 * i, 50, 200 + 20 * i, 750)
-            G.DrawLine(Pens.Gray, 0, 50, 1000, 50)
-        Next
+            '左边200显示名称，上面50显示帧
+            For i = 0 To 39
+                G.DrawLine(Pens.Gray, 200 + 20 * i, 50, 200 + 20 * i, 750)
+                G.DrawLine(Pens.Gray, 0, 50, 1000, 50)
+            Next
 
-        For i = ShowingFrame - 19 To ShowingFrame + 20
-            If i >= 0 AndAlso i Mod 5 = 0 Then
-                Dim tp As New Pen(Color.Gray)
-                tp.Width = 3
+            For i = ShowingFrame - 19 To ShowingFrame + 20
+                If i >= 0 AndAlso i Mod 5 = 0 Then
+                    Dim tp As New Pen(Color.Gray)
+                    tp.Width = 3
 
-                G.DrawLine(tp, 200 + 20 * (i - ShowingFrame + 19), 50, 200 + 20 * (i - ShowingFrame + 19), 750)
-                G.DrawString(i.ToString, DefaultFont, Brushes.Black, 200 + 20 * (i - ShowingFrame + 19) - 10, 15)
-            End If
-        Next
+                    G.DrawLine(tp, 200 + 20 * (i - ShowingFrame + 19), 50, 200 + 20 * (i - ShowingFrame + 19), 750)
+                    G.DrawString(i.ToString, DefaultFont, Brushes.Black, 200 + 20 * (i - ShowingFrame + 19) - 10, 15)
+                End If
+            Next
 
-        For i = 0 To 9
-            Dim tbindex As Short = ShowingBone + i
-            Dim tboneface As MMDBoneFace = GetBoneFace(tbindex)
-            If tboneface IsNot Nothing Then
-                If TypeOf tboneface Is Bone Then
-                    Dim tbone As Bone = CType(tboneface, Bone)
-                    G.DrawString(tbone.Name, DefaultFont, Brushes.DarkBlue, 5, 55 + i * 50)
-                    For j = 0 To tbone.GetPointCount - 1
-                        Dim tf As Integer = tbone.PointList(j).Frame - ShowingFrame
-                        If tf >= -19 AndAlso tf <= 20 Then
-                            G.FillEllipse(Brushes.DarkGray, 190 + 20 * (tf + 19), 65 + i * 50, 20, 20)
-                            If (SelectedPoint IsNot Nothing) AndAlso i = SelectedPointBone AndAlso tbone.PointList(j).Equals(SelectedPoint) Then
-                                G.FillEllipse(Brushes.DarkRed, 193 + 20 * (tf + 19), 68 + i * 50, 14, 14)
+            For i = 0 To 9
+                Dim tbindex As Short = ShowingBone + i
+                Dim tboneface As MMDBoneFace = GetBoneFace(tbindex)
+                If tboneface IsNot Nothing Then
+                    If TypeOf tboneface Is Bone Then
+                        Dim tbone As Bone = CType(tboneface, Bone)
+                        G.DrawString(tbone.Name, DefaultFont, Brushes.DarkBlue, 5, 55 + i * 50)
+                        For j = 0 To tbone.GetPointCount - 1
+                            Dim tf As Integer = tbone.PointList(j).Frame - ShowingFrame
+                            If tf >= -19 AndAlso tf <= 20 Then
+                                G.FillEllipse(Brushes.DarkGray, 190 + 20 * (tf + 19), 65 + i * 50, 20, 20)
+                                If (SelectedPoint IsNot Nothing) AndAlso i = SelectedPointBone AndAlso tbone.PointList(j).Equals(SelectedPoint) Then
+                                    G.FillEllipse(Brushes.DarkRed, 193 + 20 * (tf + 19), 68 + i * 50, 14, 14)
+                                End If
                             End If
-                        End If
-                    Next
+                        Next
+                    Else
+                        Dim tface As Face = CType(tboneface, Face)
+                        G.DrawString(tface.Name, DefaultFont, Brushes.DarkGreen, 5, 55 + i * 50)
+                        For j = 0 To tface.GetPointCount - 1
+                            Dim tf As Integer = tface.PointList(j).Frame - ShowingFrame
+                            If tf >= -19 AndAlso tf <= 20 Then
+                                G.FillEllipse(Brushes.DarkGray, 190 + 20 * (tf + 19), 65 + i * 50, 20, 20)
+                                If (SelectedPoint IsNot Nothing) AndAlso i = SelectedPointBone AndAlso tface.PointList(j).Equals(SelectedPoint) Then
+                                    G.FillEllipse(Brushes.DarkRed, 193 + 20 * (tf + 19), 68 + i * 50, 14, 14)
+                                End If
+                            End If
+                        Next
+                    End If
+                End If
+
+            Next
+
+            '700以下显示数值
+            If SelectedPoint IsNot Nothing Then
+                G.FillRectangle(Brushes.LightGray, 0, 700, 1000, 50)
+                If TypeOf SelectedPoint Is BonePoint Then
+                    G.DrawString("X=" & CType(SelectedPoint, BonePoint).X.ToString, DefaultFont, Brushes.Black, 5, 715)
+                    G.DrawString("Y=" & CType(SelectedPoint, BonePoint).Y.ToString, DefaultFont, Brushes.Black, 155, 705)
+                    G.DrawString("Z=" & CType(SelectedPoint, BonePoint).Z.ToString, DefaultFont, Brushes.Black, 305, 715)
+                    '显示欧拉角
+                    G.DrawString("RX=" & CType(SelectedPoint, BonePoint).SX.ToString, DefaultFont, Brushes.Black, 455, 705)
+                    G.DrawString("RY=" & CType(SelectedPoint, BonePoint).SY.ToString, DefaultFont, Brushes.Black, 605, 715)
+                    G.DrawString("RZ=" & CType(SelectedPoint, BonePoint).SZ.ToString, DefaultFont, Brushes.Black, 755, 705)
+
                 Else
-                    Dim tface As Face = CType(tboneface, Face)
-                    G.DrawString(tface.Name, DefaultFont, Brushes.DarkGreen, 5, 55 + i * 50)
-                    For j = 0 To tface.GetPointCount - 1
-                        Dim tf As Integer = tface.PointList(j).Frame - ShowingFrame
-                        If tf >= -19 AndAlso tf <= 20 Then
-                            G.FillEllipse(Brushes.DarkGray, 190 + 20 * (tf + 19), 65 + i * 50, 20, 20)
-                            If (SelectedPoint IsNot Nothing) AndAlso i = SelectedPointBone AndAlso tface.PointList(j).Equals(SelectedPoint) Then
-                                G.FillEllipse(Brushes.DarkRed, 193 + 20 * (tf + 19), 68 + i * 50, 14, 14)
-                            End If
-                        End If
-                    Next
+                    G.DrawString("V=" & CType(SelectedPoint, FacePoint).V.ToString, DefaultFont, Brushes.Black, 5, 715)
+
                 End If
             End If
 
-        Next
 
-        '700以下显示数值
-        If SelectedPoint IsNot Nothing Then
-            G.FillRectangle(Brushes.LightGray, 0, 700, 1000, 50)
-            If TypeOf SelectedPoint Is BonePoint Then
-                G.DrawString("X=" & CType(SelectedPoint, BonePoint).X.ToString, DefaultFont, Brushes.Black, 5, 715)
-                G.DrawString("Y=" & CType(SelectedPoint, BonePoint).Y.ToString, DefaultFont, Brushes.Black, 155, 705)
-                G.DrawString("Z=" & CType(SelectedPoint, BonePoint).Z.ToString, DefaultFont, Brushes.Black, 305, 715)
-                '显示欧拉角
-                G.DrawString("RX=" & CType(SelectedPoint, BonePoint).SX.ToString, DefaultFont, Brushes.Black, 455, 705)
-                G.DrawString("RY=" & CType(SelectedPoint, BonePoint).SY.ToString, DefaultFont, Brushes.Black, 605, 715)
-                G.DrawString("RZ=" & CType(SelectedPoint, BonePoint).SZ.ToString, DefaultFont, Brushes.Black, 755, 705)
-
-            Else
-                G.DrawString("V=" & CType(SelectedPoint, FacePoint).V.ToString, DefaultFont, Brushes.Black, 5, 715)
-
-            End If
         End If
-
 
 
         P.Image = bm
@@ -473,9 +477,14 @@ lblFail:
 
     Private Sub P_MouseDown(sender As Object, e As MouseEventArgs) Handles P.MouseDown
         If ExeMode = eExeMode.WAV Then
-            If WavControlBar.JudgeHit(e) Then
-                MouseFlag = True
-                StartX = e.X
+            If e.Y >= 400 / 2 Then
+                SelectedBlock = SelectPYBlock(e)
+                Call Paint()
+            Else
+                If WavControlBar.JudgeHit(e) Then
+                    MouseFlag = True
+                    StartX = e.X
+                End If
             End If
         Else
             If e.Button = MouseButtons.Left Then
@@ -665,13 +674,13 @@ lblFail:
                     Dim tpy As cPinyin = ListPY(i)
                     If tpy.isPause Then
                         cPinyinConfig.ApplyPause(ListFace)
-                    ElseIf tpy.Special = SpecialPinyin.ZhiChiShiRi Then
+                    ElseIf tpy.getSpecial = SpecialPinyin.ZhiChiShiRi Then
                         cPinyinConfig.ApplyZhi(ListFace)
-                    ElseIf tpy.Special = SpecialPinyin.ZiCiSi Then
+                    ElseIf tpy.getSpecial = SpecialPinyin.ZiCiSi Then
                         cPinyinConfig.ApplyZi(ListFace)
-                    ElseIf tpy.Special = SpecialPinyin.Yu Then
+                    ElseIf tpy.getSpecial = SpecialPinyin.Yu Then
                         cPinyinConfig.ApplyYu(ListFace)
-                    ElseIf tpy.Special = SpecialPinyin.None Then
+                    ElseIf tpy.getSpecial = SpecialPinyin.None Then
                         cPinyinConfig.ApplyNormal(ListFace, tpy)
                     End If
 
@@ -681,6 +690,16 @@ lblFail:
                     End If
                 Next
             End If
+            If ListPY.Count Then
+                For i = ListPY.Count - 1 To 0 Step -1
+                    Dim py As cPinyin = ListPY(i)
+                    If py.Pinyin.Length = 0 Then
+                        ListPY.Remove(py)
+                    End If
+                Next
+            End If
+
+            ConvertToPYBlock(ListPY, PYBlockList, WavAnalyzer.GetAudioLength * FRAME_PER_SECOND / ListPY.Count)
 
             PostMsg("完成")
         End If
@@ -714,10 +733,8 @@ lblFail:
 
     End Sub
 
+    <Obsolete("", True)>
     Public Sub OpenReadingText()
-
-        'obsolete
-
         Dim openFile As New OpenFileDialog
         openFile.Filter = "拼音文档|*.txt"
         openFile.Title = "打开"
@@ -756,9 +773,9 @@ lblFail:
                             Dim p2 As New FacePoint(pointer + 14, 0)
                             ListFace(j).AddPoint(p2)
                         Next
-                    ElseIf tpy.Special <> SpecialPinyin.None Then
+                    ElseIf tpy.getSpecial <> SpecialPinyin.None Then
                         'If tpy.Special = SpecialPinyin.ZhiChiShiRiZiCiSi Then
-                        If tpy.Special = SpecialPinyin.ZhiChiShiRi Then
+                        If tpy.GetSpecial = SpecialPinyin.ZhiChiShiRi Then
                             Dim tk() As Short = {0, 1, 2, -1}
                             Dim tv() As Single = {0.15, 0.3, 0.5, 0.5}
                             For j = 0 To tk.Count - 1
@@ -775,7 +792,7 @@ lblFail:
                                 End If
 
                             Next
-                        ElseIf tpy.Special = SpecialPinyin.Yu Then
+                        ElseIf tpy.getSpecial = SpecialPinyin.Yu Then
                             Dim p1 As New FacePoint(pointer, 0.6)
                             ListFace(2).AddPoint(p1)    'u
                             Dim p2 As New FacePoint(pointer + seveneight - 1, 0.6)
@@ -806,14 +823,14 @@ lblFail:
 
                             Dim tsta As Byte = 0
                             Dim tend As Byte = seveneight
-                            If .CloseMouth = CloseMouthParam.Before Or .CloseMouth = CloseMouthParam.Both Then
+                            If .GetCloseMouth = CloseMouthParam.Before Or .GetCloseMouth = CloseMouthParam.Both Then
                                 tsta = 2
                                 For j = 0 To 4
                                     SubAddVowel(pointer, 0, j)
                                     SubAddVowel(pointer + 1, 0, j)
                                 Next
                             End If
-                            If .CloseMouth = CloseMouthParam.SemiAfter Or .CloseMouth = CloseMouthParam.Both Then
+                            If .GetCloseMouth = CloseMouthParam.SemiAfter Or .GetCloseMouth = CloseMouthParam.Both Then
                                 tend -= 2
                             End If
                             If vc = 1 Then
@@ -897,7 +914,7 @@ lblFail:
 
 
                             End If
-                            If .CloseMouth = CloseMouthParam.SemiAfter Or .CloseMouth = CloseMouthParam.Both Then
+                            If .GetCloseMouth = CloseMouthParam.SemiAfter Or .GetCloseMouth = CloseMouthParam.Both Then
                                 Dim fv As Byte = .Vowel(.Vowel.Count - 1)
                                 If .SingleE AndAlso fv = 3 Then
                                     fv = 5
@@ -1395,6 +1412,5 @@ lblFail:
     Private Sub TB2_TextChanged(sender As Object, e As EventArgs) Handles TB2.TextChanged
 
     End Sub
-
 End Class
 

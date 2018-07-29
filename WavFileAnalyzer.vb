@@ -89,7 +89,7 @@ Public Class WavFileAnalyzer
         Return result
     End Function
 
-    <Obsolete("Use GetTip. 请使用GetTip方法", True)>
+    <Obsolete("Use GetTip(). 请使用GetTip方法", True)>
     Public Sub GetVolume(Second As Single, ByRef Left As Single, Optional ByRef Right As Single = -2)
         Dim position As Long = CLng(Second * ByteRate) + 44
         Dim leftData() As Byte = GetByte(position, 2)
@@ -143,9 +143,9 @@ Public Class WavFileAnalyzer
 
     End Function
 
-    '''<summery>
-    '''平均取值
-    '''</summery>
+    '<summery>
+    '平均取值
+    '</summery>
     'Private Function GetAverage(SampleStart As Single, SampleEnd As Single) As Single
     '    Dim pos1 As Long = SampleStart * ByteRate
     '    Dim pos2 As Long = SampleEnd * ByteRate
@@ -159,6 +159,9 @@ Public Class WavFileAnalyzer
     '    Return avgValue
     'End Function
 
+    ''' <summary>
+    ''' 获取音频时长，单位为秒
+    ''' </summary>
     Public Function GetAudioLength() As Single
         Return AudioLength
     End Function

@@ -1,9 +1,10 @@
 public class WavScreenController
     Private StartAt As Single = 0.0F        '均为百分比
     Private EndAt As Single = 100.0F
-    Private Reserve As New Point
+    Private Reserve As New PointF3
 
     Private ReadOnly diameter As Integer = 30
+    Private MinScale As Single = 3.0F
 
     Public MouseHitState As EMouseHitState = 0
 
@@ -15,46 +16,63 @@ public class WavScreenController
     End Enum
 
     Public sub SetStartPoint(value as Single)
-		if value < 0.0F then
-			StartAt = 0.0F
-		elseif value > 99.0F then
-			StartAt = 99.0F
-		elseif value >= EndAt - 1.0F then
-			StartAt = EndAt - 1.0F
-		else
+        If value < 0.0F Then
+            StartAt = 0.0F
+        ElseIf value > 100 - MinScale Then
+            StartAt = 100 - MinScale
+        ElseIf value >= EndAt - MinScale Then
+            StartAt = EndAt - MinScale
+        Else
 			StartAt = value
 		end if
 	end sub 
 	
 	public sub SetEndPoint(value as Single)
-		if value < 1.0F then
-			EndAt = 1.0F
-		elseif value > 100.0F then
-			EndAt = 100.0F
-		elseif EndAt <= StartAt + 1.0F then
-			EndAt = StartAt + 1.0F
-		else
-			EndAt = value
+        If value < MinScale Then
+            EndAt = MinScale
+        ElseIf value > 100.0F Then
+            EndAt = 100.0F
+        ElseIf value <= StartAt + MinScale Then
+            EndAt = StartAt + MinScale
+        Else
+            EndAt = value
 		end if
 	end sub 
 	
 	public sub MoveBar(Delta as Single)
-		dim valid as boolean = (StartAt + Delta >= 0.0F) andalso (EndAt + Delta <= 100.0F)
+        Dim valid As Boolean = (Reserve.X + Delta >= 0.0F) AndAlso (Reserve.Y + Delta <= 100.0F)
         If valid Then
             If MouseHitState Then
                 StartAt = Reserve.X + Delta
                 EndAt = Reserve.Y + Delta
-            Else
-                StartAt += Delta
-                EndAt += Delta
+            End If
+        Else
+            If Reserve.X + Delta < 0.0F Then
+                If MouseHitState Then
+                    Dim duration As Single = EndAt - StartAt
+                    StartAt = 0.0F
+                    EndAt = duration
+                End If
+            ElseIf Reserve.Y + Delta > 100.0F Then
+                If MouseHitState Then
+                    Dim duration As Single = EndAt - StartAt
+                    StartAt = 100.0F - duration
+                    EndAt = 100.0F
+                End If
             End If
         End If
     End Sub
 
+    ''' <summary>
+    ''' 获取起点百分比
+    ''' </summary>
     Public Function GetStartPoint() As Single
         Return StartAt
     End Function
 
+    ''' <summary>
+    ''' 获取终点百分比
+    ''' </summary>
     Public Function GetEndPoint() As Single
         Return EndAt
     End Function

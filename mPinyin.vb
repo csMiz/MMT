@@ -21,69 +21,6 @@ Module mPinyin
 
     End Enum
 
-    Public Class cPinyin
-        Public Pinyin As String = ""
-        Public Vowel As New List(Of Byte)
-        Public CloseMouth As CloseMouthParam = CloseMouthParam.None
-        Public isPause As Boolean = False
-        Public Special As SpecialPinyin = SpecialPinyin.None
-        Public SingleE As Boolean = True
-        Public ChangedA As Boolean = False
-
-        Public Sub New(tpinyin As String)
-            Dim tin As String = tpinyin.Trim.ToLower
-            If tin.Length Then
-                Pinyin = tin
-                If tin = "pause" Then
-                    isPause = True
-                Else
-                    Call Ana()
-                End If
-            End If
-        End Sub
-
-        Private Sub Ana()
-            Vowel.Clear()
-            CloseMouth = 0
-            If Pinyin.Contains("ie") Or Pinyin.Contains("ei") Or Pinyin.Contains("ue") Or Pinyin.Contains("ve") Or Pinyin.Contains("ye") Then
-                SingleE = False
-            End If
-            If Pinyin.Contains("ian") AndAlso Not Pinyin.Contains("iang") Then
-                ChangedA = True
-            End If
-            If Pinyin = "zhi" Or Pinyin = "chi" Or Pinyin = "shi" Or Pinyin = "ri" Then
-                Special = SpecialPinyin.ZhiChiShiRi
-            ElseIf Pinyin = "zi" Or Pinyin = "ci" Or Pinyin = "si" Then
-                Special = SpecialPinyin.ZiCiSi
-            ElseIf Pinyin = "yu" Then
-                Special = SpecialPinyin.Yu
-            Else
-                For i = 0 To Pinyin.Length - 1
-                    Dim tchar As String = Pinyin.Substring(i, 1)
-                    If tchar = "a" Then
-                        Vowel.Add(0)
-                    ElseIf tchar = "i" Or tchar = "y" Then
-                        Vowel.Add(1)
-                    ElseIf tchar = "u" Or tchar = "w" Or tchar = "v" Then
-                        Vowel.Add(2)
-                    ElseIf tchar = "e" Then
-                        Vowel.Add(3)
-                    ElseIf tchar = "o" Then
-                        Vowel.Add(4)
-                    End If
-                    If i = 0 AndAlso (tchar = "b" Or tchar = "p" Or tchar = "m" Or tchar = "f") Then
-                        CloseMouth += CloseMouthParam.Before
-                    End If
-                    If i = Pinyin.Length - 1 AndAlso (tchar = "n") Then
-                        CloseMouth += CloseMouthParam.SemiAfter
-                    End If
-                Next
-            End If
-
-        End Sub
-
-    End Class
-
     Public Class cWaveLable
         Public ID As Short   '0-4: a,i,u,e,o  5-7:wave1,2,3
         Public Value As New List(Of KeyValuePair(Of Single, Single))    'interval,value
@@ -290,7 +227,7 @@ Module mPinyin
             ElseIf tpy.ChangedA Then
                 tpycl.Labels(1).ID = 3
             End If
-            If tpy.CloseMouth = CloseMouthParam.Before Or tpy.CloseMouth = CloseMouthParam.Both Then
+            If tpy.GetCloseMouth = CloseMouthParam.Before Or tpy.GetCloseMouth = CloseMouthParam.Both Then
                 For i = 0 To tpycl.Labels.Count - 1
                     For j = 0 To tpycl.Labels(i).Value.Count - 1
                         Dim tokv As KeyValuePair(Of Single, Single) = tpycl.Labels(i).Value(j)
@@ -300,7 +237,7 @@ Module mPinyin
                     tpycl.Labels(i).Value.Insert(0, New KeyValuePair(Of Single, Single)(0.0F, 0.0F))
                 Next
             End If
-            If tpy.CloseMouth = CloseMouthParam.SemiAfter Or tpy.CloseMouth = CloseMouthParam.Both Then
+            If tpy.GetCloseMouth = CloseMouthParam.SemiAfter Or tpy.GetCloseMouth = CloseMouthParam.Both Then
                 For i = 0 To tpycl.Labels.Count - 1
                     For j = 0 To tpycl.Labels(i).Value.Count - 1
                         Dim tokv As KeyValuePair(Of Single, Single) = tpycl.Labels(i).Value(j)
@@ -323,13 +260,13 @@ Module mPinyin
             cPinyinConfig.Interval = interval
             If tpy.isPause Then
                 cPinyinConfig.ApplyPause(ListFace)
-            ElseIf tpy.Special = SpecialPinyin.ZhiChiShiRi Then
+            ElseIf tpy.getSpecial = SpecialPinyin.ZhiChiShiRi Then
                 cPinyinConfig.ApplyZhi(ListFace)
-            ElseIf tpy.Special = SpecialPinyin.ZiCiSi Then
+            ElseIf tpy.getSpecial = SpecialPinyin.ZiCiSi Then
                 cPinyinConfig.ApplyZi(ListFace)
-            ElseIf tpy.Special = SpecialPinyin.Yu Then
+            ElseIf tpy.getSpecial = SpecialPinyin.Yu Then
                 cPinyinConfig.ApplyYu(ListFace)
-            ElseIf tpy.Special = SpecialPinyin.None Then
+            ElseIf tpy.getSpecial = SpecialPinyin.None Then
                 cPinyinConfig.ApplyNormal(ListFace, tpy)
             End If
             usingIndex += 1
@@ -431,4 +368,91 @@ Module mPinyin
 
     End Sub
 
+    ''' <summary>
+    ''' 将拼音列表转换为拼音块列表
+    ''' </summary>
+    Public Sub ConvertToPYBlock(Source As List(Of cPinyin), ByRef Output As SortedList(Of Single, CPYBlock), Interval As Single)
+        If Source.Count Then
+            For i = 0 To Source.Count - 1
+                Dim py As cPinyin = Source(i)
+                Dim pyb As New CPYBlock(py, Interval, i * Interval, True)
+                Output.Add(pyb.GetStart, pyb)
+            Next
+        End If
+    End Sub
+
 End Module
+
+''' <summary>
+''' 汉语拼音信息类
+''' </summary>
+Public Class cPinyin
+    Public Pinyin As String = ""
+    Public Vowel As New List(Of Byte)
+    Private CloseMouth As CloseMouthParam = CloseMouthParam.None
+    Public isPause As Boolean = False
+    Private Special As SpecialPinyin = SpecialPinyin.None
+    Public SingleE As Boolean = True
+    Public ChangedA As Boolean = False
+
+    Public Sub New(tpinyin As String)
+        Dim tin As String = tpinyin.Trim.ToLower
+        If tin.Length Then
+            Pinyin = tin
+            If tin = "pause" Then
+                isPause = True
+            Else
+                Call Ana()
+            End If
+        End If
+    End Sub
+
+    Private Sub Ana()
+        Vowel.Clear()
+        CloseMouth = 0
+        If Pinyin.Contains("ie") Or Pinyin.Contains("ei") Or Pinyin.Contains("ue") Or Pinyin.Contains("ve") Or Pinyin.Contains("ye") Then
+            SingleE = False
+        End If
+        If Pinyin.Contains("ian") AndAlso Not Pinyin.Contains("iang") Then
+            ChangedA = True
+        End If
+        If Pinyin = "zhi" Or Pinyin = "chi" Or Pinyin = "shi" Or Pinyin = "ri" Then
+            Special = SpecialPinyin.ZhiChiShiRi
+        ElseIf Pinyin = "zi" Or Pinyin = "ci" Or Pinyin = "si" Then
+            Special = SpecialPinyin.ZiCiSi
+        ElseIf Pinyin = "yu" Then
+            Special = SpecialPinyin.Yu
+        Else
+            For i = 0 To Pinyin.Length - 1
+                Dim tchar As String = Pinyin.Substring(i, 1)
+                If tchar = "a" Then
+                    Vowel.Add(0)
+                ElseIf tchar = "i" Or tchar = "y" Then
+                    Vowel.Add(1)
+                ElseIf tchar = "u" Or tchar = "w" Or tchar = "v" Then
+                    Vowel.Add(2)
+                ElseIf tchar = "e" Then
+                    Vowel.Add(3)
+                ElseIf tchar = "o" Then
+                    Vowel.Add(4)
+                End If
+                If i = 0 AndAlso (tchar = "b" Or tchar = "p" Or tchar = "m" Or tchar = "f") Then
+                    CloseMouth += CloseMouthParam.Before
+                End If
+                If i = Pinyin.Length - 1 AndAlso (tchar = "n") Then
+                    CloseMouth += CloseMouthParam.SemiAfter
+                End If
+            Next
+        End If
+
+    End Sub
+
+    Public Function GetCloseMouth() As Byte
+        Return CloseMouth
+    End Function
+
+    Public Function GetSpecial() As Byte
+        Return Special
+    End Function
+End Class
+

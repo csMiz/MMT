@@ -1,7 +1,7 @@
 ﻿Module mConstant
     Public ReadOnly DEFAULT_FONT As Font = New Font("Microsoft YaHei", 18)
-
-
+    Public FRAME_PER_SECOND As Short = 30
+    Public ReadOnly GREEN_PEN_2PX As Pen = New Pen(Color.Green) With {.Width = 5}
 
     Public Enum SaveFileParam As Byte
         SAVENEW = 0

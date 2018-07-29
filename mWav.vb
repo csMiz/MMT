@@ -4,7 +4,9 @@ Module mWav
 
     Public WavAnalyzer As New WavFileAnalyzer
     Public WavControlBar As New WavScreenController
-    Private PYBlockList As New List(Of CPYBlock)
+    Public PYBlockList As New SortedList(Of Single, CPYBlock)
+
+    Public SelectedBlock As Integer = -1
     'Private WavPaintLength As Integer = 90   '波形声音显示长度，默认为3秒即90帧
     'Private WavPaintStart As Integer = 0     '默认0，单位为帧.0
 
@@ -25,16 +27,17 @@ Module mWav
     End Sub
 
     Public Sub AddPYBlock(tBlock As CPYBlock)
-        PYBlockList.Add(tBlock)
-        Call SortPYBlock()
+        PYBlockList.Add(tBlock.GetStart, tBlock)
+        'Call SortPYBlock()
     End Sub
 
     ''' <summary>
     ''' 时间轴从小到大排列拼音块，并分析重叠错误
     ''' </summary>
+    <Obsolete("改用sorted list以后不再需要此方法", True)>
     Public Sub SortPYBlock()
         Dim comparison As New Comparison(Of CPYBlock)(Function(a As CPYBlock, b As CPYBlock) a.GetStart - b.GetStart)
-        PYBlockList.Sort(comparison)
+        'PYBlockList.Sort(comparison)
 
         If PYBlockList.Count > 1 Then
             For i = 0 To PYBlockList.Count - 2
@@ -76,47 +79,158 @@ Module mWav
 
     End Sub
 
-    'Public Sub PaintPYBlocks(G As Graphics)
-    '    Dim tbytes As List(Of Byte) = waveFile.GetSampleImage(wavPaintStart, wavPaintLength, 800)
-    '    For i = 100 To 899
-    '        Dim tvalue As Byte = tbytes(i - 100)
-    '        G.DrawLine(Pens.Gray, 100 + i, 328 - tvalue, 100 + i, 200)
-    '    Next
-    '    G.DrawLine(Pens.Gray, 100, 350, 900, 350)
-    '    G.DrawLine(Pens.Black, 100, 328, 900, 328)
-    '    G.DrawLine(Pens.Black, 100, 72, 900, 72)
-    '    For i = wavPaintStart To wavPaintStart + wavPaintLength
-    '        If i Mod 5 = 0 Then
-    '            G.DrawString(i.ToString, DefaultFont, Brushes.DarkBlue, 5, 55 + i * 50)
-    '        End If
-    '        Dim tlinex As Short = 100 + (i - wavPaintStart) * 800 / wavPaintLength
-    '        G.DrawLine(Pens.Gray, tlinex, 450, tlinex, 700)
-    '    Next
-    '    If PYBlockList.Count Then
-    '        For Each tpyb As CPYBlock In PYBlockList
-    '            Dim shouldShow As Boolean = tpyb.GetStart + tpyb.GetLength > WavPaintStart AndAlso tpyb.GetStart < WavPaintStart + WavPaintLength
-    '            If shouldShow Then
-    '                G.FillRectangle(Brushes.CornflowerBlue, tpyb.GetStart - WavPaintStart, 500, tpyb.GetStart + tpyb.GetLength - WavPaintStart, 600)
-    '            End If
-    '        Next
-    '    End If
-    'End Sub
+    Public Sub PaintPYBlocks(G As Graphics)
+        If PYBlockList.Count Then
+            '区间单位为帧
+            Dim showingStart As Single = WavControlBar.GetStartPoint * WavAnalyzer.GetAudioLength * FRAME_PER_SECOND / 100
+            Dim showingEnd As Single = WavControlBar.GetEndPoint * WavAnalyzer.GetAudioLength * FRAME_PER_SECOND / 100
 
-    Public Function SelectPYBlock(X As Long) As CPYBlock
-        If Not PYBlockList.Count Then Return Nothing
+            Dim displayIndexStart As Integer = 0
+            Dim displayIndexEnd As Integer = PYBlockList.Count - 1
+            '计算绘制区间
+            For i = 0 To PYBlockList.Count - 1
+                Dim block As CPYBlock = PYBlockList.ElementAt(i).Value
+                If block.GetStart + block.GetLength > showingStart Then
+                    displayIndexStart = i
+                    Exit For
+                End If
+            Next
+            For i = displayIndexStart To PYBlockList.Count - 1
+                Dim block As CPYBlock = PYBlockList.ElementAt(i).Value
+                If block.GetStart > showingEnd Then
+                    displayIndexEnd = i - 1
+                    Exit For
+                End If
+            Next
+            If displayIndexEnd < displayIndexStart Then displayIndexEnd = displayIndexStart
+            '绘制
+            For i = displayIndexEnd To displayIndexStart Step -1
+                Dim block As CPYBlock = PYBlockList.ElementAt(i).Value
+                Dim startSecond As Single = WavControlBar.GetStartPoint * WavAnalyzer.GetAudioLength / 100
+                Dim endSecond As Single = WavControlBar.GetEndPoint * WavAnalyzer.GetAudioLength / 100
+                Dim px_per_second As Single = 800 / (endSecond - startSecond)
+                Dim drawLeft As Single = 100 + (block.GetStart / FRAME_PER_SECOND - startSecond) * px_per_second
+                Dim drawWidth As Single = (block.GetLength / FRAME_PER_SECOND) * px_per_second
+                If drawWidth < 0.0F Then drawWidth = 0.0F
+                If SelectedBlock = i Then
+                    G.FillRectangle(Brushes.AntiqueWhite, drawLeft, 400, drawWidth, 60)
+                Else
+                    G.FillRectangle(Brushes.LightGray, drawLeft, 400, drawWidth, 60)
+                End If
+                G.DrawRectangle(Pens.Black, drawLeft, 400, drawWidth, 60)
+                If block.IfLinkNext Then
+                    G.DrawLine(GREEN_PEN_2PX, drawLeft + drawWidth, 400, drawLeft + drawWidth, 460)
+                End If
+                If drawWidth >= 40 Then
+                    G.DrawString(block.GetLabel, DEFAULT_FONT, Brushes.Black, New PointF(drawLeft + 5, 405))
+                End If
+
+            Next
+
+            If SelectedBlock <> -1 Then
+                Dim block As CPYBlock = PYBlockList.ElementAt(SelectedBlock).Value
+                Dim lblPinyin As String = block.GetPinyin
+                Dim lblStartFrame As Single = block.GetStart
+                Dim lblStartSecond As Single = block.GetStart / FRAME_PER_SECOND
+                Dim lblEndFrame As Single = block.GetEnd
+                Dim lblEndSecond As Single = block.GetEnd / FRAME_PER_SECOND
+                Dim lblLinkNext As Boolean = block.IfLinkNext
+
+                G.DrawString("拼音：" + lblPinyin, DEFAULT_FONT, Brushes.Black, New PointF(110, 470))
+                G.DrawString("起始时间：" + lblStartSecond.ToString("F2") + "秒[" + lblStartFrame.ToString("F2") + "帧]", DEFAULT_FONT, Brushes.Black, New PointF(110, 500))
+                G.DrawString("结束时间：" + lblEndSecond.ToString("F2") + "秒[" + lblEndFrame.ToString("F2") + "帧]", DEFAULT_FONT, Brushes.Black, New PointF(110, 530))
+                G.DrawString("自动连接下一个拼音：", DEFAULT_FONT, Brushes.Black, New PointF(110, 560))
+                If lblLinkNext Then
+                    G.DrawString("是", DEFAULT_FONT, Brushes.Black, New PointF(400, 560))
+                Else
+                    G.DrawString("否", DEFAULT_FONT, Brushes.Black, New PointF(400, 560))
+                End If
+
+                G.FillRectangle(Brushes.LightGray, 100, 675, 200, 75)
+                G.FillRectangle(Brushes.LightGray, 300, 675, 200, 75)
+                G.FillRectangle(Brushes.LightGray, 500, 675, 200, 75)
+                G.DrawRectangle(Pens.Black, 100, 675, 200, 75)
+                G.DrawRectangle(Pens.Black, 300, 675, 200, 75)
+                G.DrawRectangle(Pens.Black, 500, 675, 200, 75)
+
+                G.DrawString("移 动", DEFAULT_FONT, Brushes.Black, New PointF(160, 695))
+                G.DrawString("时 长", DEFAULT_FONT, Brushes.Black, New PointF(360, 695))
+                G.DrawString("连 接", DEFAULT_FONT, Brushes.Black, New PointF(560, 695))
+            End If
+
+        End If
+    End Sub
+
+    Public Sub PaintWavUIGrid(G As Graphics)
+        G.FillRectangle(Brushes.White, 0, 0, 99, 750)
+        G.FillRectangle(Brushes.White, 900, 0, 100, 750)
+
+        G.DrawLine(Pens.Black, 100.0F, 0.0F, 100.0F, 750.0F)
+        G.DrawLine(Pens.Black, 900.0F, 0.0F, 900.0F, 750.0F)
+        G.DrawLine(Pens.Black, 100.0F, 360.0F, 900.0F, 360.0F)
+
+        If WavAnalyzer.IsMono Then
+            G.DrawString("单声道", DEFAULT_FONT, Brushes.Black, New PointF(10, 160))
+        Else
+            G.DrawString("左声道", DEFAULT_FONT, Brushes.Black, New PointF(10, 80))
+            G.DrawString("右声道", DEFAULT_FONT, Brushes.Black, New PointF(10, 210))
+        End If
+
+        G.DrawString("缩放", DEFAULT_FONT, Brushes.Black, New PointF(10, 300))
+        G.DrawString("拼音", DEFAULT_FONT, Brushes.Black, New PointF(10, 380))
+
+        Dim startSecond As Single = WavControlBar.GetStartPoint * WavAnalyzer.GetAudioLength / 100
+        Dim endSecond As Single = WavControlBar.GetEndPoint * WavAnalyzer.GetAudioLength / 100
+
+        G.DrawString(startSecond.ToString("F2") + "秒", DEFAULT_FONT, Brushes.Black, New PointF(5, 500))
+        G.DrawString(endSecond.ToString("F2") + "秒", DEFAULT_FONT, Brushes.Black, New PointF(905, 500))
+
+        G.DrawString((startSecond * FRAME_PER_SECOND).ToString("F1") + "帧", DEFAULT_FONT, Brushes.Black, New PointF(5, 550))
+        G.DrawString((endSecond * FRAME_PER_SECOND).ToString("F1") + "帧", DEFAULT_FONT, Brushes.Black, New PointF(905, 550))
+
+    End Sub
+
+    ''' <summary>
+    ''' 判定选中
+    ''' </summary>
+    Public Function SelectPYBlock(e As MouseEventArgs) As Integer
+        Dim trueX As Single = e.X * 2
+        Dim trueY As Single = e.Y * 2
+        Dim startSecond As Single = WavControlBar.GetStartPoint * WavAnalyzer.GetAudioLength / 100
+        Dim endSecond As Single = WavControlBar.GetEndPoint * WavAnalyzer.GetAudioLength / 100
+        Dim px_per_second As Single = 800 / (endSecond - startSecond)
+
+        If PYBlockList.Count = 0 Then Return -1
         Dim ub As Integer = PYBlockList.Count - 1
         Dim lb As Integer = 0
         Dim middle As Integer
-        Do
-            middle = (ub - lb) / 2
-            If X < PYBlockList(middle).GetStart Then
-                ub = middle
-            ElseIf X > PYBlockList(middle).GetStart + PYBlockList(middle).GetLength Then
-                lb = middle
-            Else
-                Return PYBlockList(middle)
-            End If
-        Loop
+        If trueY >= 400 AndAlso trueY <= 460 AndAlso trueX > 100 AndAlso trueX < 900 Then
+            Dim recCount As Integer = 0
+            Dim stableResult As Boolean = False
+            Do
+                middle = (ub + lb) / 2
+                Dim obj As CPYBlock = PYBlockList.ElementAt(middle).Value
+                If trueX < (obj.GetStart / FRAME_PER_SECOND - startSecond) * px_per_second + 100 Then
+                    ub = middle
+                ElseIf trueX > ((obj.GetStart + obj.GetLength) / FRAME_PER_SECOND - startSecond) * px_per_second + 100 Then
+                    lb = middle
+                Else
+                    Return middle
+                End If
+                If (lb = ub - 1) Then
+                    If stableResult Then
+                        Return ub
+                    End If
+                    stableResult = True
+                End If
+                recCount += 1
+                If recCount > 10000 Then
+                    Return -1
+                End If
+            Loop
+        Else
+            Return -1
+        End If
 
     End Function
 
