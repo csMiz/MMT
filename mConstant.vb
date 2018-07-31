@@ -3,6 +3,12 @@
     Public FRAME_PER_SECOND As Short = 30
     Public ReadOnly GREEN_PEN_2PX As Pen = New Pen(Color.Green) With {.Width = 5}
 
+    ''' <summary>
+    ''' 当前版本号
+    ''' </summary>
+    Public Const ME_VERSION As String = "1.0.11"
+
+
     Public Enum SaveFileParam As Byte
         SAVENEW = 0
         VMDTEST = 1

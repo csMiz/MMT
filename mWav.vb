@@ -4,7 +4,12 @@ Module mWav
 
     Public WavAnalyzer As New WavFileAnalyzer
     Public WavControlBar As New WavScreenController
-    Public PYBlockList As New SortedList(Of Single, CPYBlock)
+    Public PYBlockList As New List(Of CPYBlock)
+
+    Public Btn1 As New CDrawingButton(100, 675, 300, 750, "移 动")
+    Public Btn2 As New CDrawingButton(300, 675, 500, 750, "时 长")
+    Public Btn3 As New CDrawingButton(500, 675, 700, 750, "连 接")
+    Public SelectedButton As Integer = -1
 
     Public SelectedBlock As Integer = -1
     'Private WavPaintLength As Integer = 90   '波形声音显示长度，默认为3秒即90帧
@@ -27,7 +32,7 @@ Module mWav
     End Sub
 
     Public Sub AddPYBlock(tBlock As CPYBlock)
-        PYBlockList.Add(tBlock.GetStart, tBlock)
+        PYBlockList.Add(tBlock)
         'Call SortPYBlock()
     End Sub
 
@@ -79,6 +84,42 @@ Module mWav
 
     End Sub
 
+    Public Sub DrawPYBlocklist(G As Graphics)
+        If PYBlockList.Count Then
+            For i = 0 To PYBlockList.Count - 1
+                Dim headBlock As CPYBlock = PYBlockList(i)
+                Dim blockArray As New List(Of CPYBlock)
+                headBlock.Expand(blockArray)    'ByRef方法，将列表展开
+                For j = blockArray.Count - 1 To 0 Step -1
+                    blockArray(j).DrawBlock(G)
+                Next
+            Next
+        End If
+    End Sub
+
+    Public Sub RefreshAllBlocks()
+        If PYBlockList.Count Then
+            For i = 0 To PYBlockList.Count - 1
+                PYBlockList(i).RefreshArray()
+            Next
+        End If
+    End Sub
+
+    Public Function FindBlock(e As MouseEventArgs) As CPYBlock
+        Dim trueX As Single = e.X * 2
+        Dim FrameX As Single 'trueX.. 进行转换
+
+        Throw New NotImplementedException()
+
+        For i = PYBlockList.Count - 1 To 0 Step -1
+            If trueX >= PYBlockList(i).GetStart Then
+                Return PYBlockList(i).SearchInArray(FrameX)
+            End If
+        Next
+        Return Nothing
+    End Function
+
+    <Obsolete("Use DrawPYBlockList()", True)>
     Public Sub PaintPYBlocks(G As Graphics)
         If PYBlockList.Count Then
             '区间单位为帧
@@ -89,14 +130,14 @@ Module mWav
             Dim displayIndexEnd As Integer = PYBlockList.Count - 1
             '计算绘制区间
             For i = 0 To PYBlockList.Count - 1
-                Dim block As CPYBlock = PYBlockList.ElementAt(i).Value
+                Dim block As CPYBlock = PYBlockList(i)
                 If block.GetStart + block.GetLength > showingStart Then
                     displayIndexStart = i
                     Exit For
                 End If
             Next
             For i = displayIndexStart To PYBlockList.Count - 1
-                Dim block As CPYBlock = PYBlockList.ElementAt(i).Value
+                Dim block As CPYBlock = PYBlockList(i)
                 If block.GetStart > showingEnd Then
                     displayIndexEnd = i - 1
                     Exit For
@@ -105,7 +146,7 @@ Module mWav
             If displayIndexEnd < displayIndexStart Then displayIndexEnd = displayIndexStart
             '绘制
             For i = displayIndexEnd To displayIndexStart Step -1
-                Dim block As CPYBlock = PYBlockList.ElementAt(i).Value
+                Dim block As CPYBlock = PYBlockList(i)
                 Dim startSecond As Single = WavControlBar.GetStartPoint * WavAnalyzer.GetAudioLength / 100
                 Dim endSecond As Single = WavControlBar.GetEndPoint * WavAnalyzer.GetAudioLength / 100
                 Dim px_per_second As Single = 800 / (endSecond - startSecond)
@@ -128,7 +169,7 @@ Module mWav
             Next
 
             If SelectedBlock <> -1 Then
-                Dim block As CPYBlock = PYBlockList.ElementAt(SelectedBlock).Value
+                Dim block As CPYBlock = PYBlockList(SelectedBlock)
                 Dim lblPinyin As String = block.GetPinyin
                 Dim lblStartFrame As Single = block.GetStart
                 Dim lblStartSecond As Single = block.GetStart / FRAME_PER_SECOND
@@ -146,16 +187,9 @@ Module mWav
                     G.DrawString("否", DEFAULT_FONT, Brushes.Black, New PointF(400, 560))
                 End If
 
-                G.FillRectangle(Brushes.LightGray, 100, 675, 200, 75)
-                G.FillRectangle(Brushes.LightGray, 300, 675, 200, 75)
-                G.FillRectangle(Brushes.LightGray, 500, 675, 200, 75)
-                G.DrawRectangle(Pens.Black, 100, 675, 200, 75)
-                G.DrawRectangle(Pens.Black, 300, 675, 200, 75)
-                G.DrawRectangle(Pens.Black, 500, 675, 200, 75)
-
-                G.DrawString("移 动", DEFAULT_FONT, Brushes.Black, New PointF(160, 695))
-                G.DrawString("时 长", DEFAULT_FONT, Brushes.Black, New PointF(360, 695))
-                G.DrawString("连 接", DEFAULT_FONT, Brushes.Black, New PointF(560, 695))
+                Btn1.DrawButton(G)
+                Btn2.DrawButton(G)
+                Btn3.DrawButton(G)
             End If
 
         End If
@@ -193,6 +227,7 @@ Module mWav
     ''' <summary>
     ''' 判定选中
     ''' </summary>
+    <Obsolete("", True)>
     Public Function SelectPYBlock(e As MouseEventArgs) As Integer
         Dim trueX As Single = e.X * 2
         Dim trueY As Single = e.Y * 2
@@ -209,7 +244,7 @@ Module mWav
             Dim stableResult As Boolean = False
             Do
                 middle = (ub + lb) / 2
-                Dim obj As CPYBlock = PYBlockList.ElementAt(middle).Value
+                Dim obj As CPYBlock = PYBlockList(middle)
                 If trueX < (obj.GetStart / FRAME_PER_SECOND - startSecond) * px_per_second + 100 Then
                     ub = middle
                 ElseIf trueX > ((obj.GetStart + obj.GetLength) / FRAME_PER_SECOND - startSecond) * px_per_second + 100 Then

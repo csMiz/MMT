@@ -18,6 +18,9 @@ Public Class Form1
     Public ShowingFrame As Integer = 0
     Public ShowingBone As Integer = 0
 
+    Public AllowUpdate As Boolean = True
+    Private WebEntityParser As New CommonEntityParser
+
     Private ExeMode As eExeMode = eExeMode.None
 
     Private Function GetBoneFace(Index As Short) As MMDBoneFace
@@ -260,6 +263,10 @@ lblFail:
 
         Call InitNDTable()
 
+        If AllowUpdate Then
+            Call CheckUpdate()
+        End If
+
     End Sub
 
     ''' <summary>
@@ -344,6 +351,13 @@ lblFail:
                     Call LoadWavFile()
                     ExeMode = eExeMode.WAV
                     Call Paint()
+                ElseIf tcmd = "checkupdate" Then
+                    Call CheckUpdate()
+                    'ElseIf tcmd = "shutupdate" Then    不允许更改吧
+                    '    AllowUpdate = False
+                    'ElseIf tcmd = "openupdate" Then
+                    '    AllowUpdate = True
+
 
                 Else
                     PostMsg("未知指令")
@@ -471,13 +485,23 @@ lblFail:
 
 
             End If
-            End If
+        End If
 
     End Sub
 
     Private Sub P_MouseDown(sender As Object, e As MouseEventArgs) Handles P.MouseDown
         If ExeMode = eExeMode.WAV Then
-            If e.Y >= 400 / 2 Then
+            If e.Y >= 675 / 2 AndAlso SelectedBlock <> -1 Then
+                SelectedButton = -1
+                If Btn1.MouseDown(e) Then
+                    SelectedButton = 1
+                ElseIf Btn2.MouseDown(e) Then
+                    SelectedButton = 2
+                ElseIf Btn3.MouseDown(e) Then
+                    SelectedButton = 3
+                End If
+                If SelectedButton <> -1 Then MouseFlag = True
+            ElseIf e.Y >= 400 / 2 Then
                 SelectedBlock = SelectPYBlock(e)
                 Call Paint()
             Else
@@ -487,7 +511,7 @@ lblFail:
                 End If
             End If
         Else
-            If e.Button = MouseButtons.Left Then
+                If e.Button = MouseButtons.Left Then
                 If SelectedPoint IsNot Nothing AndAlso e.Y >= 350 Then
                     If TypeOf SelectedPoint Is BonePoint Then
                         Dim skey As Short = CShort((e.X - 3) \ 50)
@@ -527,6 +551,10 @@ lblFail:
     Private Sub P_MouseUp(sender As Object, e As MouseEventArgs) Handles P.MouseUp
         If ExeMode = eExeMode.WAV Then
             WavControlBar.MouseHitState = WavScreenController.EMouseHitState.NONE
+            If SelectedButton = 1 Then
+                Btn1.MouseUp(e)
+            End If
+            SelectedButton = -1
         End If
         LastDeltaFrame = 0
         MouseFlag = False
@@ -537,8 +565,22 @@ lblFail:
 
         If MouseFlag Then
             If ExeMode = eExeMode.WAV Then
-                Dim delta As Single = -StartX + e.X
-                WavControlBar.MouseMove(delta)
+                If SelectedButton <> -1 Then    '按钮拖动
+                    If SelectedButton = 1 Then  '移动
+                        Dim deltaX As Single = Btn1.MouseMove(e)
+                        If SelectedBlock = 0 OrElse (SelectedBlock >= 1 AndAlso Not (PYBlockList.ElementAt(SelectedBlock - 1).Value.IfLinkNext)) Then
+                            PYBlockList.ElementAt(SelectedBlock).Value.SetDeltaStart(deltaX)
+                        Else
+                            PostMsg("不可移动")
+                        End If
+                    ElseIf SelectedButton = 2 Then  '时长
+
+                    End If
+
+                    Else    '音频控制栏移动
+                    Dim delta As Single = -StartX + e.X
+                    WavControlBar.MouseMove(delta)
+                End If
                 Call Paint()
             Else
                 Dim deltaframe As Short = CShort((StartX - e.X) \ 10)
@@ -1409,8 +1451,50 @@ lblFail:
 
     End Sub
 
-    Private Sub TB2_TextChanged(sender As Object, e As EventArgs) Handles TB2.TextChanged
+    ''' <summary>
+    ''' 检查程序更新
+    ''' </summary>
+    Private Async Sub CheckUpdate()
+        Dim hc As New Net.Http.HttpClient
+        Dim webUri As String = "http://207.148.14.219:8083/mmt/version"
+        Dim response As String = vbNullString
+        Try
+            response = Await hc.GetStringAsync(webUri)
+        Catch ex As Exception
+            Return  '错误，停止检查
+        End Try
+        If response.Length Then
+            WebEntityParser.Load(response)
+            Dim result As List(Of CEntity) = WebEntityParser.GetResult
+            If result.Count Then
+                Dim serverVersion As String = result(0).GetValue("version").Replace("""", vbNullString)
+                Dim haveNew As Boolean = HaveNewVersion(ME_VERSION, serverVersion)
+                If haveNew Then
+                    PostMsg("有新版本可用（" + serverVersion + "）")
+                    PostMsg("立即访问 https://github.com/csMiz/MMT/tree/master/publish 下载！")
+                End If
+            End If
+        End If
+
 
     End Sub
+
+    Private Function HaveNewVersion(MyVersion As String, ServerVersion As String) As Boolean
+        Dim nowVersion() As String = Regex.Split(MyVersion, "\.")
+        Dim getVersion() As String = Regex.Split(ServerVersion, "\.")
+
+        If (CInt(getVersion(0)) > CInt(nowVersion(0))) Then
+            Return True
+        End If
+        If (CInt(getVersion(1)) > CInt(nowVersion(1))) Then
+            Return True
+        End If
+        If (CInt(getVersion(2)) > CInt(nowVersion(2))) Then
+            Return True
+        End If
+        Return False
+    End Function
+
+
 End Class
 

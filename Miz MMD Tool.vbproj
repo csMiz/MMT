@@ -106,6 +106,7 @@
     <Import Include="System.Threading.Tasks" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CDrawingButton.vb" />
     <Compile Include="CPYBlock.vb" />
     <Compile Include="mConstant.vb" />
     <Compile Include="Form1.vb">
@@ -137,6 +138,10 @@
     </Compile>
     <Compile Include="WavFileAnalyzer.vb" />
     <Compile Include="WavScreenController.vb" />
+    <Compile Include="web\CEntity.vb" />
+    <Compile Include="web\CommonEntityParser.vb" />
+    <Compile Include="web\IEntityObjectConverter.vb" />
+    <Compile Include="web\IEntityParser.vb" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Form1.resx">
