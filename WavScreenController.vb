@@ -5,7 +5,8 @@ public class WavScreenController
 
     Private ReadOnly diameter As Integer = 30
     Private MinScale As Single = 3.0F
-
+	public MouseClickSecondPin as single = -1
+	
     Public MouseHitState As EMouseHitState = 0
 
     Public Enum EMouseHitState As Byte
@@ -121,4 +122,7 @@ public class WavScreenController
         End If
     End Sub
 
+	public sub SetWavClickTag(e as MouseEventArgs)
+		
+	end sub 
 End class

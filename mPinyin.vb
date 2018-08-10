@@ -4,7 +4,7 @@ Imports System.Text.RegularExpressions
 Module mPinyin
 
     Public ListPY As New List(Of cPinyin)
-
+    'Public OutListPY As New List(Of cPinyin)
 
     Public Enum CloseMouthParam As Byte
         None = 0
@@ -42,7 +42,7 @@ Module mPinyin
                     Return r
                 End If
             Next
-            Return 1
+            Return 0
         End Function
     End Class
 
@@ -119,23 +119,33 @@ Module mPinyin
 
         End Function
 
-        Public Sub Write(faces As List(Of Face), Interval As Single, ByRef Startat As Single, Optional wav As List(Of Byte) = Nothing)
+        ''' <summary>
+        ''' 写入拼音关键帧，返回写入后的时间指针位置
+        ''' </summary>
+        ''' <param name="faces">输出表情列表</param>
+        ''' <param name="Interval">时长</param>
+        ''' <param name="Startat">起始</param>
+        ''' <param name="wav"></param>
+        ''' <returns>写入后的时值</returns>
+        Public Function Write(faces As List(Of Face), interval As Single, ByVal startat As Single, Optional wav As List(Of Byte) = Nothing) As Single
 
-            Dim used() As Boolean = {False, False, False, False, False}
+			'这个补零是错误的
+            'Dim used() As Boolean = {False, False, False, False, False}
 
             If Labels.Count Then
                 For i = 0 To Labels.Count - 1
                     Dim tl As cWaveLable = Labels(i)
+					Dim tvowel As Short = -1
+                    If wav Is Nothing Then
+                        tvowel = tl.ID
+                    Else
+                        tvowel = wav(tl.ID - 5)
+                    End If
                     For j = 0 To tl.Value.Count - 1
                         Dim tkvp As KeyValuePair(Of Single, Single) = tl.Value(j)
-                        Dim tx As Single = tkvp.Key * Interval
-                        Dim tvowel As Short = -1
-                        If wav Is Nothing Then
-                            tvowel = tl.ID
-                        Else
-                            tvowel = wav(tl.ID - 5)
-                        End If
-                        used(tvowel) = True
+                        Dim tx As Single = tkvp.Key * interval
+
+                        'used(tvowel) = True
                         If Math.Abs(Startat + tx - CInt(Startat + tx)) < 0.05 Then
                             Dim tfp As New FacePoint(CInt(Startat + tx), tkvp.Value)
                             faces(tvowel).AddPoint(tfp)
@@ -147,18 +157,39 @@ Module mPinyin
                         End If
 
                     Next
+					'加入边界补零
+					'不能使用覆盖，应该使用最大值
+					dim leftValue as single = startat+tl.Value(0).Key*interval
+					dim rightValue as single = startat+tl.Value(tl.Value.Count-1).Key*interval
+					dim leftEdge as integer = Math.Truncate(leftValue)
+					dim rightEdge as integer = Math.Ceiling(rightValue)
+                    'If leftEdge = leftValue Then leftEdge -= 1
+                    If faces(tvowel).GetAt(leftEdge) IsNot Nothing Then
+                        leftEdge -= 1
+                    End If
+                    If leftEdge < 0 then leftEdge = 0
+                    'if rightEdge = rightValue then rightEdge += 1
+                    If faces(tvowel).GetAt(rightEdge) IsNot Nothing Then
+                        rightEdge += 1
+                    End If
+
+                    Dim leftEdgePoint as new FacePoint(leftEdge, 0)
+					dim rightEdgePoint as new FacePoint(rightEdge, 0)
+					faces(tvowel).AddPointApplyMax(leftEdgePoint)
+					faces(tvowel).AddPointApplyMax(rightEdgePoint)
+					
                 Next
             End If
-            Startat += Interval
 
-            For i = 0 To 4
-                If used(i) Then
-                    Dim tfp As New FacePoint(Math.Truncate(Startat) + 1, 0)
-                    faces(i).AddPoint(tfp)
-                End If
-            Next
+            'For i = 0 To 4
+            '    If used(i) Then
+            '        Dim tfp As New FacePoint(Math.Truncate(Startat) + 1, 0)
+            '        faces(i).AddPoint(tfp)
+            '    End If
+            'Next
 
-        End Sub
+            Return Startat + Interval
+        End Function
 
         Public Sub CloneLabel(sourceL As Short, copycount As Short)
             For i = 1 To copycount
@@ -190,19 +221,35 @@ Module mPinyin
 
         Public Shared usingIndex As Long = 0
 
-        Public Shared Sub ApplyPause(faces As List(Of Face))
-            Pause.Write(faces, Interval, Pointer)
+        Public Shared Sub ApplyPause(faces As List(Of Face), Optional start As Single = -1)
+            If start < 0 Then
+                Pointer = Pause.Write(faces, Interval, Pointer)
+            Else
+                Pause.Write(faces, Interval, start)
+            End If
         End Sub
-        Public Shared Sub ApplyZhi(faces As List(Of Face))
-            Zhi.Write(faces, Interval, Pointer)
+        Public Shared Sub ApplyZhi(faces As List(Of Face), Optional start As Single = -1)
+            If start < 0 Then
+                Pointer = Zhi.Write(faces, Interval, Pointer)
+            Else
+                Zhi.Write(faces, Interval, start)
+            End If
         End Sub
-        Public Shared Sub ApplyZi(faces As List(Of Face))
-            Zi.Write(faces, Interval, Pointer)
+        Public Shared Sub ApplyZi(faces As List(Of Face), Optional start As Single = -1)
+            If start < 0 Then
+                Pointer = Zi.Write(faces, Interval, Pointer)
+            Else
+                Zi.Write(faces, Interval, start)
+            End If
         End Sub
-        Public Shared Sub ApplyYu(faces As List(Of Face))
-            Yu.Write(faces, Interval, Pointer)
+        Public Shared Sub ApplyYu(faces As List(Of Face), Optional start As Single = -1)
+            If start < 0 Then
+                Pointer = Yu.Write(faces, Interval, Pointer)
+            Else
+                Yu.Write(faces, Interval, start)
+            End If
         End Sub
-        Public Shared Sub ApplyNormal(faces As List(Of Face), tpy As cPinyin)
+        Public Shared Sub ApplyNormal(faces As List(Of Face), tpy As cPinyin, Optional start As Single = -1)
             Dim tpycl As cPinyinConfigLabel = Nothing
             Dim tvc As Short = tpy.Vowel.Count
             If tvc = 1 Then
@@ -249,11 +296,16 @@ Module mPinyin
                 Next
             End If
 
-            tpycl.Write(faces, Interval, Pointer)
-
+            'tpycl.Write(faces, Interval, Pointer)
+            If start < 0 Then
+                Pointer = tpycl.Write(faces, Interval, Pointer)
+            Else
+                tpycl.Write(faces, Interval, start)
+            End If
 
         End Sub
 
+        <Obsolete("改用PYBlock了", False)>
         Public Shared Sub ApplySinglePinyin(faces As List(Of Face), interval As Short)
 
             Dim tpy As cPinyin = ListPY(usingIndex)
@@ -273,6 +325,48 @@ Module mPinyin
             If usingIndex >= ListPY.Count Then usingIndex = -1
 
         End Sub
+
+        ''' <summary>
+        ''' 将拼音块信息写成VMD关键帧
+        ''' </summary>
+        Public Shared Sub ApplySinglePinyinOut(pybs As List(Of CPYBlock))
+            For i = 0 To 4
+                ListFace(i).PointList.Clear()
+            Next
+            If pybs.Count Then
+                If CheckPYBListError(PYBlockList) Then
+                    For Each pybHead As CPYBlock In pybs
+                        WriteBlock(pybHead)
+                    Next
+                Else
+                    Form1.PostMsg("拼音块布局存在错误")
+                End If
+            End If
+        End Sub
+
+        Private Shared Sub WriteBlock(pyb As CPYBlock)
+
+            Dim tpy As cPinyin = pyb.GetPinyinClass
+            cPinyinConfig.Interval = pyb.GetDuration
+            Dim start As Single = pyb.GetStart
+            If tpy.isPause Then
+                cPinyinConfig.ApplyPause(ListFace, start)
+            ElseIf tpy.GetSpecial = SpecialPinyin.ZhiChiShiRi Then
+                cPinyinConfig.ApplyZhi(ListFace, start)
+            ElseIf tpy.GetSpecial = SpecialPinyin.ZiCiSi Then
+                cPinyinConfig.ApplyZi(ListFace, start)
+            ElseIf tpy.GetSpecial = SpecialPinyin.Yu Then
+                cPinyinConfig.ApplyYu(ListFace, start)
+            ElseIf tpy.GetSpecial = SpecialPinyin.None Then
+                cPinyinConfig.ApplyNormal(ListFace, tpy, start)
+            End If
+            If pyb.IfHaveNext Then
+                Call WriteBlock(pyb.NextBlock)
+            End If
+
+        End Sub
+
+
 
     End Class
 
@@ -306,6 +400,12 @@ Module mPinyin
         If mc0.Count > 0 Then
             For i = 0 To mc0.Count - 1
                 configtext = configtext.Replace("<!--" & mc0(i).Groups(1).Value & "-->", "")
+            Next
+        End If
+        mc0 = Regex.Matches(configtext, "<info(.[\s\S]+?)</info>")
+        If mc0.Count Then
+            For i = 0 To mc0.Count - 1
+                configtext = configtext.Replace("<info" & mc0(i).Groups(1).Value & "</info>", "")
             Next
         End If
         Dim mc1 As MatchCollection = Regex.Matches(configtext, "<(.[\s\S]+?)>(.[\s\S]+?)</")
@@ -371,12 +471,25 @@ Module mPinyin
     ''' <summary>
     ''' 将拼音列表转换为拼音块列表
     ''' </summary>
-    Public Sub ConvertToPYBlock(Source As List(Of cPinyin), ByRef Output As SortedList(Of Single, CPYBlock), Interval As Single)
+    <Obsolete("Use PYBlockAssembler Class", True)>
+    Public Sub ConvertToPYBlock(Source As List(Of cPinyin), ByRef Output As List(Of CPYBlock), Interval As Single)
         If Source.Count Then
+            Dim lastPyb As CPYBlock = Nothing
             For i = 0 To Source.Count - 1
                 Dim py As cPinyin = Source(i)
                 Dim pyb As New CPYBlock(py, Interval, i * Interval, True)
-                Output.Add(pyb.GetStart, pyb)
+                If py.isFullStop Then
+                    If lastPyb IsNot Nothing Then
+                        If lastPyb.IfLinkNext Then
+                            lastPyb.BreakLinkNext()
+                        End If
+                    End If
+                Else
+                    lastPyb.NextBlock = pyb
+                    pyb.LastBlock = lastPyb
+                    Output.Add(pyb)
+                End If
+                lastPyb = pyb
             Next
         End If
     End Sub
@@ -391,6 +504,7 @@ Public Class cPinyin
     Public Vowel As New List(Of Byte)
     Private CloseMouth As CloseMouthParam = CloseMouthParam.None
     Public isPause As Boolean = False
+    Public isFullStop As Boolean = False
     Private Special As SpecialPinyin = SpecialPinyin.None
     Public SingleE As Boolean = True
     Public ChangedA As Boolean = False
@@ -401,6 +515,8 @@ Public Class cPinyin
             Pinyin = tin
             If tin = "pause" Then
                 isPause = True
+            ElseIf tin = "break" Then
+                isFullStop = true
             Else
                 Call Ana()
             End If
@@ -454,5 +570,6 @@ Public Class cPinyin
     Public Function GetSpecial() As Byte
         Return Special
     End Function
+
 End Class
 

@@ -2,11 +2,11 @@
     Public ReadOnly DEFAULT_FONT As Font = New Font("Microsoft YaHei", 18)
     Public FRAME_PER_SECOND As Short = 30
     Public ReadOnly GREEN_PEN_2PX As Pen = New Pen(Color.Green) With {.Width = 5}
+    Public ReadOnly RED_PEN_2PX As Pen = New Pen(Color.Red) With {.Width = 5}
 
     ''' <summary>
     ''' 当前版本号
     ''' </summary>
-    Public Const ME_VERSION As String = "1.0.11"
 
 
     Public Enum SaveFileParam As Byte

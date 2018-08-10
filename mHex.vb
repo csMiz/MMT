@@ -2,6 +2,8 @@
 Imports System.Text.RegularExpressions
 Imports Miz_MMD_Tool
 
+'里面有各类模块和类，建议拆分
+
 Module mMath
     Private NDTable As New List(Of PointF)
 
@@ -465,6 +467,7 @@ Module mMMDPhysics
 
     Public Function PhysicsBoneMove(tb As PhysicsBone, pos As BonePoint, dir As Vector3, vel As Single) As BonePoint
 
+        Throw New NotImplementedException
     End Function
 
 End Module
@@ -494,6 +497,7 @@ Module mMMD
     Public Interface MMDPoint
         Function Copy() As MMDPoint
         Sub Apply(tp As MMDPoint)
+		Sub ApplyMax(input as MMDPoint)
         Property Frame As Integer
 
     End Interface
@@ -501,10 +505,11 @@ Module mMMD
     Public Interface MMDBoneFace
         Function Copy() As MMDBoneFace
         Sub AddPoint(tp As MMDPoint)
+		Sub AddPointApplyMax(input as MMDPoint)
         Function IsEmpty() As Boolean
         Property Name As String
         Function GetPointCount() As Integer
-
+        Function GetAt(frame As Integer) As MMDPoint
 
     End Interface
 
@@ -541,6 +546,12 @@ Module mMMD
                 PointList.Add(CType(tp, BonePoint))
             End If
         End Sub
+		
+		public sub AddPointApplyMax(input as MMDPoint) Implements MMDBoneFace.AddPointApplyMax
+		
+			throw new NotImplementedException()
+			
+		end sub 
 
         Public Function Copy() As MMDBoneFace Implements MMDBoneFace.Copy
             Throw New NotImplementedException()
@@ -552,6 +563,10 @@ Module mMMD
 
         Public Function GetPointCount() As Integer Implements MMDBoneFace.GetPointCount
             Return PointList.Count
+        End Function
+
+        Public Function GetAt(frame As Integer) As MMDPoint Implements MMDBoneFace.GetAt
+            Throw New NotImplementedException()
         End Function
     End Class
 
@@ -826,6 +841,10 @@ Module mMMD
                 Call CalcSSRotate()
             End With
         End Sub
+		
+		public sub ApplyMax(input as MMDPoint) Implements MMDPoint.ApplyMax
+			throw new NotImplementedException()
+		end sub 
     End Class
 
     Public Class Face
@@ -861,6 +880,21 @@ Module mMMD
                 PointList.Add(CType(tp, FacePoint))
             End If
         End Sub
+		
+		public sub AddPointApplyMax(input as MMDPoint) Implements MMDBoneFace.AddPointApplyMax
+			If TypeOf input Is FacePoint Then
+                Dim frame As Integer = input.Frame
+                If CBool(Me.PointList.Count) Then
+                    For Each comparePoint As FacePoint In Me.PointList
+                        If comparePoint.Frame = frame Then
+                            comparePoint.ApplyMax(input)
+                            Exit Sub
+                        End If
+                    Next
+                End If
+                Me.PointList.Add(CType(input, FacePoint))
+            End If
+		end sub 
 
         Public Function Copy() As MMDBoneFace Implements MMDBoneFace.Copy
             Throw New NotImplementedException
@@ -872,6 +906,19 @@ Module mMMD
 
         Public Function GetPointCount() As Integer Implements MMDBoneFace.GetPointCount
             Return PointList.Count
+        End Function
+
+        Public Function GetAt(frame As Integer) As MMDPoint Implements MMDBoneFace.GetAt
+            Dim count = Me.GetPointCount
+            If count Then
+                For i = 0 To count - 1
+                    Dim point As FacePoint = Me.PointList(i)
+                    If point.Frame = frame Then
+                        Return point
+                    End If
+                Next
+            End If
+            Return Nothing
         End Function
     End Class
 
@@ -913,6 +960,16 @@ Module mMMD
                 V = .V
             End With
         End Sub
+		
+		public sub ApplyMax(input as MMDPoint) Implements MMDPoint.ApplyMax
+			Dim facePoint As FacePoint = CType(input, FacePoint)
+            With facePoint
+                if Me.V < .V then
+					Me.V = .V
+				end if 
+            End With
+		end sub 
+		
     End Class
 
 End Module

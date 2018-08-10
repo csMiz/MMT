@@ -2,6 +2,7 @@
 Imports System.Text.RegularExpressions
 Imports Miz_MMD_Tool
 Imports System.Math
+Imports JSONEntityParser
 
 Public Class Form1
 
@@ -19,9 +20,15 @@ Public Class Form1
     Public ShowingBone As Integer = 0
 
     Public AllowUpdate As Boolean = True
-    Private WebEntityParser As New CommonEntityParser
 
-    Private ExeMode As eExeMode = eExeMode.None
+    Private ExeMode As eExeMode = eExeMode.NONE
+
+    Private HoldMsgList As New List(Of String)
+    Private JSONParser As New CommonEntityParser
+	public WavPinList as new List(Of Single)
+
+    Public ME_VERSION As String = VersionControl.VersionControl.GetVersion
+    Public ME_RELEASE_TIME As String = VersionControl.VersionControl.GetReleaseTime
 
     Private Function GetBoneFace(Index As Short) As MMDBoneFace
 
@@ -46,7 +53,7 @@ Public Class Form1
 
             WavControlBar.DrawBar(G)
             PaintWavMap(G)
-            PaintPYBlocks(G)
+            DrawPYBlocklist(G)
             PaintWavUIGrid(G)
 
         ElseIf ExeMode = eExeMode.VMD OrElse ExeMode = eExeMode.NONE Then
@@ -63,7 +70,7 @@ Public Class Form1
                     tp.Width = 3
 
                     G.DrawLine(tp, 200 + 20 * (i - ShowingFrame + 19), 50, 200 + 20 * (i - ShowingFrame + 19), 750)
-                    G.DrawString(i.ToString, DefaultFont, Brushes.Black, 200 + 20 * (i - ShowingFrame + 19) - 10, 15)
+                    G.DrawString(i.ToString, DEFAULT_FONT, Brushes.Black, 200 + 20 * (i - ShowingFrame + 19) - 10, 15)
                 End If
             Next
 
@@ -73,7 +80,7 @@ Public Class Form1
                 If tboneface IsNot Nothing Then
                     If TypeOf tboneface Is Bone Then
                         Dim tbone As Bone = CType(tboneface, Bone)
-                        G.DrawString(tbone.Name, DefaultFont, Brushes.DarkBlue, 5, 55 + i * 50)
+                        G.DrawString(tbone.Name, DEFAULT_FONT, Brushes.DarkBlue, 5, 55 + i * 50)
                         For j = 0 To tbone.GetPointCount - 1
                             Dim tf As Integer = tbone.PointList(j).Frame - ShowingFrame
                             If tf >= -19 AndAlso tf <= 20 Then
@@ -85,7 +92,7 @@ Public Class Form1
                         Next
                     Else
                         Dim tface As Face = CType(tboneface, Face)
-                        G.DrawString(tface.Name, DefaultFont, Brushes.DarkGreen, 5, 55 + i * 50)
+                        G.DrawString(tface.Name, DEFAULT_FONT, Brushes.DarkGreen, 5, 55 + i * 50)
                         For j = 0 To tface.GetPointCount - 1
                             Dim tf As Integer = tface.PointList(j).Frame - ShowingFrame
                             If tf >= -19 AndAlso tf <= 20 Then
@@ -104,16 +111,16 @@ Public Class Form1
             If SelectedPoint IsNot Nothing Then
                 G.FillRectangle(Brushes.LightGray, 0, 700, 1000, 50)
                 If TypeOf SelectedPoint Is BonePoint Then
-                    G.DrawString("X=" & CType(SelectedPoint, BonePoint).X.ToString, DefaultFont, Brushes.Black, 5, 715)
-                    G.DrawString("Y=" & CType(SelectedPoint, BonePoint).Y.ToString, DefaultFont, Brushes.Black, 155, 705)
-                    G.DrawString("Z=" & CType(SelectedPoint, BonePoint).Z.ToString, DefaultFont, Brushes.Black, 305, 715)
+                    G.DrawString("X=" & CType(SelectedPoint, BonePoint).X.ToString, DEFAULT_FONT, Brushes.Black, 5, 715)
+                    G.DrawString("Y=" & CType(SelectedPoint, BonePoint).Y.ToString, DEFAULT_FONT, Brushes.Black, 155, 705)
+                    G.DrawString("Z=" & CType(SelectedPoint, BonePoint).Z.ToString, DEFAULT_FONT, Brushes.Black, 305, 715)
                     '显示欧拉角
-                    G.DrawString("RX=" & CType(SelectedPoint, BonePoint).SX.ToString, DefaultFont, Brushes.Black, 455, 705)
-                    G.DrawString("RY=" & CType(SelectedPoint, BonePoint).SY.ToString, DefaultFont, Brushes.Black, 605, 715)
-                    G.DrawString("RZ=" & CType(SelectedPoint, BonePoint).SZ.ToString, DefaultFont, Brushes.Black, 755, 705)
+                    G.DrawString("RX=" & CType(SelectedPoint, BonePoint).SX.ToString, DEFAULT_FONT, Brushes.Black, 455, 705)
+                    G.DrawString("RY=" & CType(SelectedPoint, BonePoint).SY.ToString, DEFAULT_FONT, Brushes.Black, 605, 715)
+                    G.DrawString("RZ=" & CType(SelectedPoint, BonePoint).SZ.ToString, DEFAULT_FONT, Brushes.Black, 755, 705)
 
                 Else
-                    G.DrawString("V=" & CType(SelectedPoint, FacePoint).V.ToString, DefaultFont, Brushes.Black, 5, 715)
+                    G.DrawString("V=" & CType(SelectedPoint, FacePoint).V.ToString, DEFAULT_FONT, Brushes.Black, 5, 715)
 
                 End If
             End If
@@ -128,9 +135,41 @@ Public Class Form1
 
     End Sub
 
+    ''' <summary>
+    ''' 在控制栏输出一行信息
+    ''' </summary>
     Public Sub PostMsg(text As String)
         TB1.Text = TB1.Text + text + vbCrLf
+    End Sub
 
+    ''' <summary>
+    ''' 在鼠标松开前缓存信息
+    ''' </summary>
+    Public Sub HoldPostMsg(text As String)
+        If HoldMsgList.Count Then
+            For Each s As String In HoldMsgList
+                If s = text Then
+                    Return
+                Else
+                    HoldMsgList.Add(text)
+                End If
+            Next
+        Else
+            HoldMsgList.Add(text)
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' 输出缓存中的信息
+    ''' </summary>
+    Public Sub ReleaseHoldMsg()
+        If HoldMsgList.Count Then
+            For Each s As String In HoldMsgList
+                PostMsg(s)
+            Next
+
+            HoldMsgList.Clear()
+        End If
     End Sub
 
     Public Sub OpenFile()
@@ -181,9 +220,12 @@ Public Class Form1
 
     End Sub
 
-    Private Sub SaveNewFile(Optional param As SaveFileParam = SaveFileParam.SaveNew)
+    Private Sub SaveNewFile(Optional param As SaveFileParam = SaveFileParam.SAVENEW)
+        If ExeMode = eExeMode.WAV Then
+            Call cPinyinConfig.ApplySinglePinyinOut(PYBlockList)
+        End If
         Dim tstream As FileStream = Nothing
-        If param = SaveFileParam.SaveNew Then
+        If param = SaveFileParam.SAVENEW Then
             Dim saveFile As New SaveFileDialog
             saveFile.Filter = "vmd动作文件|*.vmd"
             saveFile.Title = "另存为"
@@ -196,10 +238,10 @@ Public Class Form1
             tstream = CType(saveFile.OpenFile, FileStream)
             UsingFileName = saveFile.FileName
             UsingFileName = UsingFileName.Remove(UsingFileName.Length - 4)
-        ElseIf param = SaveFileParam.VMDTest Then
+        ElseIf param = SaveFileParam.VMDTEST Then
             Dim savefile As New FileStream("C:\Users\sscs\Desktop\VMDT.vmd", FileMode.OpenOrCreate)
             tstream = savefile
-        ElseIf param = SaveFileParam.Save Then
+        ElseIf param = SaveFileParam.SAVE Then
             Dim savefile As New FileStream(UsingFileURI, FileMode.OpenOrCreate)
             tstream = savefile
         End If
@@ -263,17 +305,11 @@ lblFail:
 
         Call InitNDTable()
 
-        If AllowUpdate Then
-            Call CheckUpdate()
-        End If
-
     End Sub
 
     ''' <summary>
     ''' 所有功能
     ''' </summary>
-    ''' <param name="sender"></param>
-    ''' <param name="e"></param>
     Private Sub TB2_KeyPress(sender As Object, e As KeyPressEventArgs) Handles TB2.KeyPress
 
         If e.KeyChar = ChrW(13) Then
@@ -291,12 +327,12 @@ lblFail:
                     If UsingFileURI = "" Then
                         Call SaveNewFile()
                     Else
-                        Call SaveNewFile(SaveFileParam.Save)
+                        Call SaveNewFile(SaveFileParam.SAVE)
                     End If
                 ElseIf tcmd = "saveas" Then
                     Call SaveNewFile()
                 ElseIf tcmd = "savetest" Then
-                    Call SaveNewFile(SaveFileParam.VMDTest)
+                    Call SaveNewFile(SaveFileParam.VMDTEST)
                 ElseIf tcmd = "paint" Then
                     Call Paint()
                 ElseIf tcmd = "copy" Then
@@ -315,16 +351,27 @@ lblFail:
                 ElseIf tcmd = "cls" Then
                     TB1.Text = ""
                 ElseIf tcmd = "py" Then
-                    Call LoadPinyinConfig()
-                    Call ApplyPinyin(7.5)
-                    Call Paint()
+                    PostMsg("指令已废弃，请使用'pyb'")
+                    'Call LoadPinyinConfig()
+                    'Call ApplyPinyin(7.5)
+                    'Call Paint()
                 ElseIf tcmd = "pysingle" Then
-                    ExeMode = eExeMode.PINYIN_MANUAL
+                    PostMsg("指令已废弃，请使用'pyb'")
+                    'ExeMode = eExeMode.PINYIN_MANUAL
+                    'Call LoadPinyinConfig()
+                    'Call ApplyPinyin()
+                    'PostMsg("下一个：" & ListPY(0).Pinyin)
+                ElseIf tcmd = "pyb" Then
+                    If ExeMode <> eExeMode.WAV Then
+                        ExeMode = eExeMode.WAV
+                        WavAnalyzer.AddedBlankSecond = 10
+                        PostMsg("没有载入wav声音参考，自动创建10秒长度")
+                    End If
                     Call LoadPinyinConfig()
-                    Call ApplyPinyin()
-                    PostMsg("下一个：" & ListPY(0).Pinyin)
+                    Call ApplyPinyinWithBlocks()
+                    Call Paint()
                 ElseIf tcmd = "mouth" Then
-                    PostMsg("obsolete function.")
+                    PostMsg("指令已废弃，请使用'pyb'")
                     'Call OpenReadingText()
                     'Call Paint()
                 ElseIf tcmd = "cards" Then
@@ -357,7 +404,24 @@ lblFail:
                     '    AllowUpdate = False
                     'ElseIf tcmd = "openupdate" Then
                     '    AllowUpdate = True
-
+                ElseIf tcmd = "feedback" Then
+                    Call OpenFeedbackPage()
+                ElseIf tcmd = "about" orelse tcmd = "info" Then
+                    Call SoftwareInfo()
+                ElseIf tcmd = "applypy" Then
+                    Call cPinyinConfig.ApplySinglePinyinOut(PYBlockList)
+                    Call Paint()
+                ElseIf tcmd = "vmdmode" Then
+                    ExeMode = eExeMode.VMD
+                    Call Paint()
+                ElseIf tcmd = "wavmode" Then
+                    ExeMode = eExeMode.WAV
+                    Call Paint()
+                ElseIf tcmd = "clearface" Then
+                    For Each face As Face In ListFace
+                        face.PointList.Clear()
+                    Next
+                    Call Paint()
 
                 Else
                     PostMsg("未知指令")
@@ -410,22 +474,39 @@ lblFail:
                     Call GenerateBez(0, CInt(tst(1)))
                     Call Paint()
                 ElseIf tcmd = "py" Then
-                    If ExeMode = eExeMode.PINYIN_MANUAL Then
-                        Call cPinyinConfig.ApplySinglePinyin(ListFace, CInt(tst(1)))
-                        Call Paint()
-                        If cPinyinConfig.usingIndex <> -1 Then
-                            PostMsg("下一个：" & ListPY(cPinyinConfig.usingIndex).Pinyin)
-                        Else
-                            PostMsg("结束")
-                        End If
-                        Call Paint()
-                    Else
-                        Call LoadPinyinConfig()
-                        Call ApplyPinyin(CSng(tst(1)))
-                        Call Paint()
-                    End If
-                Else
+                    PostMsg("指令已废弃，请使用'pyb'")
+                    'If ExeMode = eExeMode.PINYIN_MANUAL Then
+                    '    Call cPinyinConfig.ApplySinglePinyin(ListFace, CInt(tst(1)))
+                    '    Call Paint()
+                    '    If cPinyinConfig.usingIndex <> -1 Then
+                    '        PostMsg("下一个：" & ListPY(cPinyinConfig.usingIndex).Pinyin)
+                    '    Else
+                    '        PostMsg("结束")
+                    '    End If
+                    '    Call Paint()
+                    'Else
+                    '    Call LoadPinyinConfig()
+                    '    Call ApplyPinyin(CSng(tst(1)))
+                    '    Call Paint()
+                    'End If
+                ElseIf tcmd = "addwavlength" Then
+                    WavAnalyzer.AddedBlankSecond += CSng(tst(1))
+                    If WavAnalyzer.AddedBlankSecond < 0 Then WavAnalyzer.AddedBlankSecond = 0
+                    Call Paint()
+                ElseIf tcmd = "frame_per_second" Then
+                    FRAME_PER_SECOND = CInt(tst(1))
+                    Call Paint()
+                ElseIf tcmd = "blocklength" Then
+                    If SelectedBlock isnot nothing then
+						dim head as CPYBlock = SelectedBlock.GetArrayHeadBlock
+						head.SetArrayAvgLength(csng(tst(1)))
+					else
+						postmsg("没有选中拼音块")
+					end If
+                    Call Paint()
 
+                Else
+                    PostMsg("未知指令")
                 End If
 
             ElseIf tst.Length = 3 Then
@@ -453,7 +534,23 @@ lblFail:
                     Dim tLength As Integer = CInt(tst(2))   '单位为帧
                     Call ShakeAsPi(tInterval, tLength)
                     Call Paint()
-
+				elseif tcmd = "sentence" then
+					dim startFrame as single = csng(tst(1))
+					dim endFrame as single = csng(tst(2))
+					if exemode = eExeMode.WAV andalso SelectedBlock isnot nothing then
+						dim headBlock as CPYBlock = SelectedBlock.GetArrayHeadBlock()
+						dim success as Boolean = SentenceOperation.SetSentence(headBlock, startFrame, endFrame)
+						call CheckPYBListError(PYBlockList)
+						call paint()
+						if not success then
+							postmsg("参数存在错误")
+						end if 
+					else
+						postmsg("没有选中对象")
+					end if 
+					
+				Else
+                    PostMsg("未知指令")
                 End If
             ElseIf tst.Length = 5 Then
                 Dim tcmd As String = tst(0)
@@ -474,10 +571,13 @@ lblFail:
                     Call CardsFix(New PointF3(CSng(tst(1)), CSng(tst(2)), CSng(tst(3))), CSng(tst(4)))
                     Call Paint()
 
+				Else
+                    PostMsg("未知指令")
                 End If
             Else
                 Dim tcmd As String = tst(0)
                 If tcmd = "???" Then
+                    PostMsg("hello[1.1.2]")
 
                 Else
                     PostMsg("未知指令")
@@ -491,7 +591,7 @@ lblFail:
 
     Private Sub P_MouseDown(sender As Object, e As MouseEventArgs) Handles P.MouseDown
         If ExeMode = eExeMode.WAV Then
-            If e.Y >= 675 / 2 AndAlso SelectedBlock <> -1 Then
+            If e.Y >= 675 / 2 AndAlso SelectedBlock IsNot Nothing Then
                 SelectedButton = -1
                 If Btn1.MouseDown(e) Then
                     SelectedButton = 1
@@ -501,9 +601,11 @@ lblFail:
                     SelectedButton = 3
                 End If
                 If SelectedButton <> -1 Then MouseFlag = True
-            ElseIf e.Y >= 400 / 2 Then
-                SelectedBlock = SelectPYBlock(e)
+            ElseIf e.Y >= 400 / 2 AndAlso e.Y <= 460 / 2 Then
+                SelectedBlock = FindBlock(e)
                 Call Paint()
+			elseif e.Y < 300/2 then
+				WavControlBar.SetWavClickTag(e)
             Else
                 If WavControlBar.JudgeHit(e) Then
                     MouseFlag = True
@@ -511,7 +613,7 @@ lblFail:
                 End If
             End If
         Else
-                If e.Button = MouseButtons.Left Then
+            If e.Button = MouseButtons.Left Then
                 If SelectedPoint IsNot Nothing AndAlso e.Y >= 350 Then
                     If TypeOf SelectedPoint Is BonePoint Then
                         Dim skey As Short = CShort((e.X - 3) \ 50)
@@ -553,12 +655,18 @@ lblFail:
             WavControlBar.MouseHitState = WavScreenController.EMouseHitState.NONE
             If SelectedButton = 1 Then
                 Btn1.MouseUp(e)
+            ElseIf SelectedButton = 2 Then
+                Btn2.MouseUp(e)
+            ElseIf SelectedButton = 3 Then
+                Btn3.MouseUp(e)
             End If
             SelectedButton = -1
         End If
         LastDeltaFrame = 0
         MouseFlag = False
-
+        Call CheckPYBListError(PYBlockList)
+        Call Paint()
+        Call ReleaseHoldMsg()
     End Sub
 
     Private Sub P_MouseMove(sender As Object, e As MouseEventArgs) Handles P.MouseMove
@@ -568,16 +676,19 @@ lblFail:
                 If SelectedButton <> -1 Then    '按钮拖动
                     If SelectedButton = 1 Then  '移动
                         Dim deltaX As Single = Btn1.MouseMove(e)
-                        If SelectedBlock = 0 OrElse (SelectedBlock >= 1 AndAlso Not (PYBlockList.ElementAt(SelectedBlock - 1).Value.IfLinkNext)) Then
-                            PYBlockList.ElementAt(SelectedBlock).Value.SetDeltaStart(deltaX)
+                        deltaX = PxToFrame(deltaX)
+                        If (Not SelectedBlock.IfHaveLast()) Then
+                            SelectedBlock.SetDeltaStart(deltaX)
                         Else
-                            PostMsg("不可移动")
+                            HoldPostMsg("不可移动")
                         End If
                     ElseIf SelectedButton = 2 Then  '时长
-
+                        Dim deltaX As Single = Btn2.MouseMove(e)
+                        deltaX = PxToFrame(deltaX)
+                        SelectedBlock.DeltaTempLength(deltaX)
                     End If
 
-                    Else    '音频控制栏移动
+                Else    '音频控制栏移动
                     Dim delta As Single = -StartX + e.X
                     WavControlBar.MouseMove(delta)
                 End If
@@ -681,10 +792,50 @@ lblFail:
             ListFace(0).AddPoint(New FacePoint(pointer, 0))
             pointer += 1
 
-        Loop While pointer < len
+        Loop While pointer < Len
 
     End Sub
 
+    Public Sub ApplyPinyinWithBlocks()
+        Dim openFile As New OpenFileDialog
+        openFile.Filter = "拼音文档|*.txt"
+        openFile.Title = "打开"
+        openFile.AddExtension = True
+        openFile.AutoUpgradeEnabled = True
+        If openFile.ShowDialog() = DialogResult.OK Then
+            Dim tstr As FileStream = CType(openFile.OpenFile, FileStream)
+            Dim r As StreamReader = New StreamReader(tstr)
+            PostMsg("正在读取拼音")
+
+            Dim pytext As String = ""
+            pytext = r.ReadToEnd
+            r.Close()
+            tstr.Dispose()
+
+            PostMsg("正在分析拼音")
+
+            Call LoadText(pytext)
+
+            PostMsg("共读取" & ListPY.Count & "个")
+            Application.DoEvents()
+
+            If ListPY.Count Then
+                For i = ListPY.Count - 1 To 0 Step -1
+                    Dim py As cPinyin = ListPY(i)
+                    If py.Pinyin.Length = 0 Then
+                        ListPY.Remove(py)
+                    End If
+                Next
+            End If
+
+            BlockAssembler.Convert(ListPY, PYBlockList, WavAnalyzer.GetAudioLength * FRAME_PER_SECOND / ListPY.Count)
+
+            PostMsg("完成")
+        End If
+
+    End Sub
+
+    <Obsolete("已经改为使用PYBlocks了"， False)>
     Public Overloads Sub ApplyPinyin(Interval As Single)
 
         Dim openFile As New OpenFileDialog
@@ -716,13 +867,13 @@ lblFail:
                     Dim tpy As cPinyin = ListPY(i)
                     If tpy.isPause Then
                         cPinyinConfig.ApplyPause(ListFace)
-                    ElseIf tpy.getSpecial = SpecialPinyin.ZhiChiShiRi Then
+                    ElseIf tpy.GetSpecial = SpecialPinyin.ZhiChiShiRi Then
                         cPinyinConfig.ApplyZhi(ListFace)
-                    ElseIf tpy.getSpecial = SpecialPinyin.ZiCiSi Then
+                    ElseIf tpy.GetSpecial = SpecialPinyin.ZiCiSi Then
                         cPinyinConfig.ApplyZi(ListFace)
-                    ElseIf tpy.getSpecial = SpecialPinyin.Yu Then
+                    ElseIf tpy.GetSpecial = SpecialPinyin.Yu Then
                         cPinyinConfig.ApplyYu(ListFace)
-                    ElseIf tpy.getSpecial = SpecialPinyin.None Then
+                    ElseIf tpy.GetSpecial = SpecialPinyin.None Then
                         cPinyinConfig.ApplyNormal(ListFace, tpy)
                     End If
 
@@ -741,7 +892,7 @@ lblFail:
                 Next
             End If
 
-            ConvertToPYBlock(ListPY, PYBlockList, WavAnalyzer.GetAudioLength * FRAME_PER_SECOND / ListPY.Count)
+            BlockAssembler.Convert(ListPY, PYBlockList, WavAnalyzer.GetAudioLength * FRAME_PER_SECOND / ListPY.Count)
 
             PostMsg("完成")
         End If
@@ -750,6 +901,7 @@ lblFail:
 
     End Sub
 
+    <Obsolete("已经改为使用PYBlocks了"， False)>
     Public Overloads Sub ApplyPinyin()
         Dim openFile As New OpenFileDialog
         openFile.Filter = "拼音文档|*.txt"
@@ -815,7 +967,7 @@ lblFail:
                             Dim p2 As New FacePoint(pointer + 14, 0)
                             ListFace(j).AddPoint(p2)
                         Next
-                    ElseIf tpy.getSpecial <> SpecialPinyin.None Then
+                    ElseIf tpy.GetSpecial <> SpecialPinyin.None Then
                         'If tpy.Special = SpecialPinyin.ZhiChiShiRiZiCiSi Then
                         If tpy.GetSpecial = SpecialPinyin.ZhiChiShiRi Then
                             Dim tk() As Short = {0, 1, 2, -1}
@@ -834,7 +986,7 @@ lblFail:
                                 End If
 
                             Next
-                        ElseIf tpy.getSpecial = SpecialPinyin.Yu Then
+                        ElseIf tpy.GetSpecial = SpecialPinyin.Yu Then
                             Dim p1 As New FacePoint(pointer, 0.6)
                             ListFace(2).AddPoint(p1)    'u
                             Dim p2 As New FacePoint(pointer + seveneight - 1, 0.6)
@@ -1452,49 +1604,62 @@ lblFail:
     End Sub
 
     ''' <summary>
-    ''' 检查程序更新
+    ''' 启动MMT Updater.exe
     ''' </summary>
-    Private Async Sub CheckUpdate()
-        Dim hc As New Net.Http.HttpClient
-        Dim webUri As String = "http://207.148.14.219:8083/mmt/version"
-        Dim response As String = vbNullString
-        Try
-            response = Await hc.GetStringAsync(webUri)
-        Catch ex As Exception
-            Return  '错误，停止检查
-        End Try
-        If response.Length Then
-            WebEntityParser.Load(response)
-            Dim result As List(Of CEntity) = WebEntityParser.GetResult
-            If result.Count Then
-                Dim serverVersion As String = result(0).GetValue("version").Replace("""", vbNullString)
-                Dim haveNew As Boolean = HaveNewVersion(ME_VERSION, serverVersion)
-                If haveNew Then
-                    PostMsg("有新版本可用（" + serverVersion + "）")
-                    PostMsg("立即访问 https://github.com/csMiz/MMT/tree/master/publish 下载！")
-                End If
-            End If
-        End If
-
-
+    Public Sub CheckUpdate()
+        Shell(Application.StartupPath & "\MMT_Updater.exe")
+        End
     End Sub
 
-    Private Function HaveNewVersion(MyVersion As String, ServerVersion As String) As Boolean
-        Dim nowVersion() As String = Regex.Split(MyVersion, "\.")
-        Dim getVersion() As String = Regex.Split(ServerVersion, "\.")
+    ''' <summary>
+    ''' 打开反馈窗口
+    ''' </summary>
+    Public Sub OpenFeedbackPage()
+        FormFeedback.Show()
+    End Sub
 
-        If (CInt(getVersion(0)) > CInt(nowVersion(0))) Then
-            Return True
+    ''' <summary>
+    ''' 从服务器获取最新一条通知
+    ''' </summary>
+    Public Async Sub PullMessage()
+        Dim hc1 As New Net.Http.HttpClient
+        Dim uri As String = "http://207.148.14.219:8083/mmt/getNews"
+        Dim response As String = vbNullString
+        Try
+            response = Await hc1.GetStringAsync(uri)
+        Catch ex As Exception
+            Return
+        End Try
+        JSONParser.Load(response)
+        Dim entityList As List(Of JSONEntity) = JSONParser.GetResult
+        If entityList.Count Then
+            Dim msgEntity As JSONEntity = entityList(0)
+            PostMsg(msgEntity.GetValue("date").Substring(0, 10))
+            PostMsg(msgEntity.GetValue("description"))
         End If
-        If (CInt(getVersion(1)) > CInt(nowVersion(1))) Then
-            Return True
-        End If
-        If (CInt(getVersion(2)) > CInt(nowVersion(2))) Then
-            Return True
-        End If
-        Return False
-    End Function
+    End Sub
 
+    ''' <summary>
+    ''' 从服务器获取所有远程命令
+    ''' </summary>
+    <Obsolete("暂不可用", False)>
+    Public Async Sub PullRemoteCommand()
+        '暂时不实现此功能
+    End Sub
+	
+	''' <summary>
+    ''' 显示软件信息
+    ''' </summary>
+	public sub SoftwareInfo()
+		dim info as String = "Miz_MMD_Tool ver." & ME_VERSION & vbcrlf 
+		info = info & ME_RELEASE_TIME & vbCrlf
+		info = info & "开发者：sscs" & vbCrLf
+        info = info & "项目主页 https://github.com/csMiz/MMT/tree/master/"
+
+        MsgBox(info, MsgBoxStyle.Information, "关于此软件")
+
+    End sub 
+	
 
 End Class
 

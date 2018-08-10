@@ -9,7 +9,7 @@ Public Class CDrawingButton
     Public Text As String = vbNullString
     Public TextMargin As New Vector2(60, 20)
 
-    Private HitPoint As New Vector2
+    Protected HitPoint As New Vector2
 
     Public Sub New()
     End Sub
@@ -34,7 +34,7 @@ Public Class CDrawingButton
     ''' </summary>
     ''' <param name="e"></param>
     ''' <returns>是否点中</returns>
-    Public Function MouseDown(e As MouseEventArgs) As Boolean
+    Public Overridable Function MouseDown(e As MouseEventArgs) As Boolean
         Dim trueX As Single = e.X * 2
         Dim trueY As Single = e.Y * 2
         If trueX >= Left AndAlso trueX < Right AndAlso trueY >= Top AndAlso trueY < Bottom Then
@@ -50,18 +50,71 @@ Public Class CDrawingButton
     ''' </summary>
     ''' <param name="e"></param>
     ''' <returns></returns>
-    Public Function MouseMove(e As MouseEventArgs) As Single
+    Public Overridable Function MouseMove(e As MouseEventArgs) As Single
         Dim trueX As Single = e.X * 2
         Return trueX - HitPoint.X
     End Function
 
-    Public Sub MouseUp(e As MouseEventArgs)
-        Dim trueX As Single = e.X * 2
-        Dim deltaX = trueX - HitPoint.X
-        PYBlockList.ElementAt(SelectedBlock).Value.SetStart(deltaX)
-        HitPoint.X = 0
-        HitPoint.Y = 0
+    ''' <summary>
+    ''' 鼠标松开处理
+    ''' </summary>
+    ''' <param name="e"></param>
+    Public Overridable Sub MouseUp(e As MouseEventArgs)
     End Sub
 
 
+End Class
+
+Public Class MoveStartButton
+    Inherits CDrawingButton
+
+    Public Sub New(L As Single, T As Single, R As Single, B As Single, Label As String)
+        MyBase.New(L, T, R, B, Label)
+    End Sub
+
+    Public Overrides Sub MouseUp(e As MouseEventArgs)
+        Dim trueX As Single = e.X * 2
+        Dim deltaX = trueX - HitPoint.X
+        deltaX = PxToFrame(deltaX)
+        SelectedBlock.SetStart(deltaX)
+        HitPoint.X = 0
+        HitPoint.Y = 0
+    End Sub
+End Class
+
+Public Class DeltaLengthButton
+    Inherits CDrawingButton
+
+    Public Sub New(L As Single, T As Single, R As Single, B As Single, Label As String)
+        Left = L
+        Right = R
+        Top = T
+        Bottom = B
+        Text = Label
+    End Sub
+
+    Public Overrides Sub MouseUp(e As MouseEventArgs)
+        Dim trueX As Single = e.X * 2
+        Dim deltaX = trueX - HitPoint.X
+        deltaX = PxToFrame(deltaX)
+        SelectedBlock.DeltaLength(deltaX)
+        HitPoint.X = 0
+        HitPoint.Y = 0
+    End Sub
+End Class
+
+Public Class ChangeLinkButton
+    Inherits CDrawingButton
+
+    Public Sub New(L As Single, T As Single, R As Single, B As Single, Label As String)
+        Left = L
+        Right = R
+        Top = T
+        Bottom = B
+        Text = Label
+    End Sub
+
+    Public Overrides Sub MouseUp(e As MouseEventArgs)
+        SelectedBlock.ChangeLink()
+    End Sub
 End Class

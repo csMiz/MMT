@@ -6,11 +6,11 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{6B462086-974C-421B-B1DF-47EAF1E0FB60}</ProjectGuid>
     <OutputType>WinExe</OutputType>
-    <StartupObject>Miz_MMD_Tool.My.MyApplication</StartupObject>
+    <StartupObject>Sub Main</StartupObject>
     <RootNamespace>Miz_MMD_Tool</RootNamespace>
-    <AssemblyName>Miz MMD Tool</AssemblyName>
+    <AssemblyName>Miz_MMD_Tool</AssemblyName>
     <FileAlignment>512</FileAlignment>
-    <MyType>WindowsForms</MyType>
+    <MyType>WindowsFormsWithCustomSubMain</MyType>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <PublishUrl>C:\Users\asdfg\Desktop\MizMT\publish\</PublishUrl>
@@ -25,7 +25,7 @@
     <MapFileExtensions>true</MapFileExtensions>
     <AutorunEnabled>true</AutorunEnabled>
     <ApplicationRevision>1</ApplicationRevision>
-    <ApplicationVersion>1.0.11.%2a</ApplicationVersion>
+    <ApplicationVersion>1.0.11.1</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
     <BootstrapperEnabled>true</BootstrapperEnabled>
@@ -37,7 +37,7 @@
     <DefineDebug>true</DefineDebug>
     <DefineTrace>true</DefineTrace>
     <OutputPath>bin\Debug\</OutputPath>
-    <DocumentationFile>Miz MMD Tool.xml</DocumentationFile>
+    <DocumentationFile>Miz_MMD_Tool.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -47,7 +47,7 @@
     <DefineTrace>true</DefineTrace>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DocumentationFile>Miz MMD Tool.xml</DocumentationFile>
+    <DocumentationFile>Miz_MMD_Tool.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
   </PropertyGroup>
   <PropertyGroup>
@@ -81,6 +81,12 @@
     <ApplicationManifest>My Project\app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Miz.MMT.VersionControl">
+      <HintPath>..\..\VersionControl\VersionControl\VersionControl\bin\Debug\Miz.MMT.VersionControl.dll</HintPath>
+    </Reference>
+    <Reference Include="Miz.Web.JSONEntityParser">
+      <HintPath>..\..\Miz.Web.JSONEntityParser\Miz.Web.JSONEntityParser\Miz.Web.JSONEntityParser\bin\Debug\Miz.Web.JSONEntityParser.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Deployment" />
@@ -106,8 +112,15 @@
     <Import Include="System.Threading.Tasks" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="MainApplication.vb" />
     <Compile Include="CDrawingButton.vb" />
     <Compile Include="CPYBlock.vb" />
+    <Compile Include="FormFeedback.Designer.vb">
+      <DependentUpon>FormFeedback.vb</DependentUpon>
+    </Compile>
+    <Compile Include="FormFeedback.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="mConstant.vb" />
     <Compile Include="Form1.vb">
       <SubType>Form</SubType>
@@ -136,16 +149,17 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+    <Compile Include="PYBlockAssembler.vb" />
+    <Compile Include="SentenceOperation.vb" />
     <Compile Include="WavFileAnalyzer.vb" />
     <Compile Include="WavScreenController.vb" />
-    <Compile Include="web\CEntity.vb" />
-    <Compile Include="web\CommonEntityParser.vb" />
-    <Compile Include="web\IEntityObjectConverter.vb" />
-    <Compile Include="web\IEntityParser.vb" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="FormFeedback.resx">
+      <DependentUpon>FormFeedback.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="My Project\Resources.resx">
       <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
