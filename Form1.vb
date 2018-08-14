@@ -25,7 +25,8 @@ Public Class Form1
 
     Private HoldMsgList As New List(Of String)
     Private JSONParser As New CommonEntityParser
-	public WavPinList as new List(Of Single)
+    Private MathEx As MathHelper = MathHelper.Instance  '单例
+    Public WavPinList as new List(Of Single)
 
     Public ME_VERSION As String = VersionControl.VersionControl.GetVersion
     Public ME_RELEASE_TIME As String = VersionControl.VersionControl.GetReleaseTime
@@ -303,7 +304,6 @@ lblFail:
         ListBone = New List(Of Bone)
         ListFace = New List(Of Face)
 
-        Call InitNDTable()
 
     End Sub
 
@@ -460,7 +460,7 @@ lblFail:
                     End If
                 ElseIf tcmd = "normaldist" Then
                     Dim tv As Double = CDbl(tst(1))
-                    PostMsg(CND(tv))
+                    PostMsg(MathEx.ND.CND(tv))
                 ElseIf tcmd = "bonelist" Then
                     ShowingBone = tst(1)
                     Call Paint()
@@ -745,7 +745,7 @@ lblFail:
     Public Sub ShakeAsPi(Interval As Short, Len As Integer)
         Dim pointer As Integer = 0
         Dim digitcount As Integer = 0
-        Dim tpi As String = getpi(1000)
+        Dim tpi As String = MathEx.GetPI(1000)
 
         Do
             Dim tg As Byte = CInt(tpi.Substring(digitcount, 1))
@@ -776,7 +776,7 @@ lblFail:
         Do
 
             Dim tacc As Single = CSng(ran.NextDouble())
-            Dim tx As Integer = CInt((RCND(tacc) + 4) * Interval / 4)
+            Dim tx As Integer = CInt((MathEx.ND.RCND(tacc) + 4) * Interval / 4)
 
             pointer += tx
             ListFace(0).AddPoint(New FacePoint(pointer, 0))
@@ -1340,12 +1340,12 @@ lblFail:
         SortPoint()
 
         Dim distsum As Single = 0
-        Dim bpplist As New List(Of BezierPenPoint)
+        Dim bpplist As New List(Of BezierPenPointObsolete)
 
         For i = 0 To ListBone(0).GetPointCount - 1 Step 2
             Dim tp1 As PointF3 = ListBone(0).PointList(i).PosToP3
             Dim tp2 As PointF3 = ListBone(0).PointList(i + 1).PosToP3
-            Dim tbp As New BezierPenPoint(tp2, tp1)
+            Dim tbp As New BezierPenPointObsolete(tp2, tp1)
             bpplist.Add(tbp)
         Next
 
@@ -1457,15 +1457,15 @@ lblFail:
     End Sub
 
     Private Sub CardsCollect(pointcount As Short)
-        Dim track As New List(Of List(Of BezierPenPoint))
+        Dim track As New List(Of List(Of BezierPenPointObsolete))
         Dim tracktween As New List(Of List(Of PointF))
 
         For i = 0 To 2
-            Dim tracksublist As New List(Of BezierPenPoint)
+            Dim tracksublist As New List(Of BezierPenPointObsolete)
             For j = 0 To pointcount - 1 Step 2
                 Dim trackp1 As PointF3 = ListBone(i).PointList(j).PosToP3
                 Dim trackp2 As PointF3 = ListBone(i).PointList(j + 1).PosToP3
-                Dim trackp As New BezierPenPoint(trackp2, trackp1)
+                Dim trackp As New BezierPenPointObsolete(trackp2, trackp1)
                 tracksublist.Add(trackp)
 
             Next

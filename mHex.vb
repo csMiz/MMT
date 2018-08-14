@@ -4,121 +4,9 @@ Imports Miz_MMD_Tool
 
 '里面有各类模块和类，建议拆分
 
-Module mMath
-    Private NDTable As New List(Of PointF)
+Public Module mMath
 
-    Public Interface iPointEx
-        Function Copy() As iPointEx
-    End Interface
-
-    Public Sub InitNDTable()
-        For i = -400 To 399
-            Dim tx As Double = i / 100
-            Dim tv As Double = CND(tx)
-            NDTable.Add(New PointF(CSng(tx), CSng(tv)))
-        Next
-    End Sub
-
-    Public Function RCND(Acc As Single) As Single
-        For i = 0 To NDTable.Count - 2
-            If Acc < NDTable(i + 1).Y AndAlso Acc >= NDTable(i).Y Then
-                Return NDTable(i).X
-            End If
-        Next
-        Return 3.99
-    End Function
-
-    Public Function CND(X As Double) As Double
-
-        Dim L As Double = 0.0
-        Dim K As Double = 0.0
-        Dim dCND As Double = 0.0
-        Const a1 As Double = 0.31938153
-        Const a2 As Double = -0.356563782
-        Const a3 As Double = 1.781477937
-        Const a4 As Double = -1.821255978
-        Const a5 As Double = 1.330274429
-        L = Abs(X)
-        K = 1.0 / (1.0 + 0.2316419 * L)
-        dCND = 1.0 - 1.0 / Sqrt(2 * Convert.ToDouble(PI.ToString())) * Exp(-L * L / 2.0) * (a1 * K + a2 * K * K + a3 * Pow(K, 3.0) + a4 * Pow(K, 4.0) + a5 * Pow(K, 5.0))
-
-        If (X < 0) Then
-            Return 1.0 - dCND
-        Else
-        End If
-        Return dCND
-
-    End Function
-
-    Public Function getpi(nums As Integer) As String
-        nums = nums / 5
-        Dim max As Long, result() As String
-        Dim i As Long, j As Long, t, d As Long, g, k As Long, f()
-        max = 18 * nums
-        ReDim f(0 To max)
-        ReDim result(nums)
-        For i = 0 To max
-            f(i) = 20000
-        Next
-        g = 20000
-        For j = max To 1 Step -18
-            t = 0
-            For i = j To 1 Step -1
-                t = t + f(i) * 100000
-                d = 2 * i + 1
-                f(i) = t - Int(t / d) * d
-                t = Int(t / d) * i
-            Next
-            k = k + 1
-            result(k) = Format(Int(g + t / 100000) Mod 100000, "00000")
-
-            g = t Mod 100000
-        Next
-        Return Join(result, "")
-    End Function
-
-    Public Class Vector3
-        Public X As Single = 0
-        Public Y As Single = 0
-        Public Z As Single = 0
-
-        Public Sub New(Optional tx As Single = 0, Optional ty As Single = 0, Optional tz As Single = 0)
-            X = tx
-            Y = ty
-            Z = tz
-
-        End Sub
-
-    End Class
-
-    Public Class PointF3
-        Implements iPointEx
-        Public X As Single = 0, Y As Single = 0, Z As Single = 0
-
-        Public Sub New(Optional tx As Single = 0, Optional ty As Single = 0, Optional tz As Single = 0)
-            X = tx
-            Y = ty
-            Z = tz
-        End Sub
-
-        Public Sub Move(v As Vector3)
-            X += v.X
-            Y += v.Y
-            Z += v.Z
-        End Sub
-
-        Public Function Copy() As iPointEx Implements iPointEx.Copy
-            Dim r As New PointF3(X, Y, Z)
-            Return r
-        End Function
-
-        Public Function GetXZ() As PointF
-            Dim r As New PointF(X, Z)
-            Return r
-        End Function
-    End Class
-
-    Public Class BezierPenPoint
+    Public Class BezierPenPointObsolete
         Public StartPoint As PointF3
         Public ArmPoint1 As PointF3
         Public ReadOnly ArmPoint2 As PointF3
@@ -138,6 +26,7 @@ Module mMath
 
     End Class
 
+    <Obsolete("请使用MathHelper", False)>
     Public Function Bezier(pCont As List(Of PointF3), t As Double) As PointF3
         If pCont.Count = 0 Then Return Nothing
         Dim r As New PointF3
@@ -150,13 +39,13 @@ Module mMath
         Return r
     End Function
 
-    Public Function Bezier(pCont As List(Of BezierPenPoint), t As Double) As PointF3
+    Public Function Bezier(pCont As List(Of BezierPenPointObsolete), t As Double) As PointF3
         If pCont.Count = 0 Then Return Nothing
 
         Dim listlen As New List(Of Single)
         For i = 0 To pCont.Count - 2
-            Dim tbpp1 As BezierPenPoint = pCont(i)
-            Dim tbpp2 As BezierPenPoint = pCont(i + 1)
+            Dim tbpp1 As BezierPenPointObsolete = pCont(i)
+            Dim tbpp2 As BezierPenPointObsolete = pCont(i + 1)
             Dim tl As Single = 0
             tl += CalcDist(tbpp1.StartPoint, tbpp1.ArmPoint2)
             tl += CalcDist(tbpp1.ArmPoint2, tbpp2.ArmPoint1)
@@ -197,7 +86,7 @@ Module mMath
         Return r
     End Function
 
-    Public Function Bezier(pCont As List(Of BezierPenPoint), slides As Integer) As PointF3
+    Public Function Bezier(pCont As List(Of BezierPenPointObsolete), slides As Integer) As PointF3
         If pCont.Count = 0 Then Return Nothing
 
         Dim linenumber As Integer = slides \ 100
@@ -225,6 +114,7 @@ Module mMath
         Return r
     End Function
 
+    <Obsolete("请使用MathHelper", False)>
     Public Function PascalT(a As Short, t As Short) As Integer
         Dim r1 As Double = 1
         Dim r2 As Double = 1
