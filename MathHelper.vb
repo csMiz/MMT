@@ -187,5 +187,10 @@ Public Class PointF3
         Return Sqrt((p1.X - p2.X) ^ 2 + (p1.Y - p2.Y) ^ 2 + (p1.Z - p2.Z) ^ 2)
     End Function
 
+    Public Shared Operator -(a As PointF3, b As PointF3) As PointF3
+        Dim r As New PointF3(a.X - b.X, a.Y - b.Y, a.Z - b.Z)
+        Return r
+    End Operator
+
 
 End Class

@@ -26,7 +26,10 @@ Public Class Form1
     Private HoldMsgList As New List(Of String)
     Private JSONParser As New CommonEntityParser
     Private MathEx As MathHelper = MathHelper.Instance  '单例
-    Public WavPinList as new List(Of Single)
+    Public WavPinList As New List(Of Single)
+
+    Public PenLine As New BezierPenLine
+    Public CanvasPenTool As New PenTool
 
     Public ME_VERSION As String = VersionControl.VersionControl.GetVersion
     Public ME_RELEASE_TIME As String = VersionControl.VersionControl.GetReleaseTime
@@ -56,6 +59,10 @@ Public Class Form1
             PaintWavMap(G)
             DrawPYBlocklist(G)
             PaintWavUIGrid(G)
+
+        ElseIf ExeMode = eExeMode.BEZIER Then
+
+            CanvasPenTool.DrawBezierLine(G)
 
         ElseIf ExeMode = eExeMode.VMD OrElse ExeMode = eExeMode.NONE Then
 
@@ -275,22 +282,41 @@ lblFail:
         Dim tb As New Bone
         tb.Name = "testbone1"
         Dim tbp As New BonePoint
-        tbp.Init(1, 2, 3, 4, 5, 6, 0)
+        'tbp.Init(1, 2, 3, 4, 5, 6, 0)
+        tbp.Init(0, 0, 0, 0, 0, 0, 0)
         tbp.Frame = 0
         tb.AddPoint(tbp)
         Dim tbp2 As New BonePoint
-        tbp2.Init(1, 2, 3, 4, 5, 6, 0)
-        tbp2.Frame = 5
+        tbp2.Init(0, 0, 20, 0, 0, 0, 0)
+        tbp2.Frame = 1
         tb.AddPoint(tbp2)
+        Dim tbp3 As New BonePoint
+        tbp3.Init(50, 0, 0, 0, 0, 0, 0)
+        tbp3.Frame = 2
+        tb.AddPoint(tbp3)
+        Dim tbp4 As New BonePoint
+        tbp4.Init(60, 0, -20, 0, 0, 0, 0)
+        tbp4.Frame = 3
+        tb.AddPoint(tbp4)
+        Dim tbp5 As New BonePoint
+        tbp5.Init(100, 0, 0, 0, 0, 0, 0)
+        tbp5.Frame = 4
+        tb.AddPoint(tbp5)
+        Dim tbp6 As New BonePoint
+        tbp6.Init(120, 0, 30, 0, 0, 0, 0)
+        tbp6.Frame = 5
+        tb.AddPoint(tbp6)
+
         ListBone.Add(tb)
 
-        Dim tb2 As New Bone
-        tb2.Name = "testbone2"
-        Dim tbp3 As New BonePoint
-        tbp3.Init(1, 2, 3, 4, 5, 6, 0)
-        tbp3.Frame = 0
-        tb2.AddPoint(tbp3)
-        ListBone.Add(tb2)
+
+        'Dim tb2 As New Bone
+        'tb2.Name = "testbone2"
+        'Dim tbp3 As New BonePoint
+        'tbp3.Init(1, 2, 3, 4, 5, 6, 0)
+        'tbp3.Frame = 0
+        'tb2.AddPoint(tbp3)
+        'ListBone.Add(tb2)
 
         Call Paint()
         'Call SaveNewFile(SaveFileParam.VMDTest)
@@ -386,7 +412,19 @@ lblFail:
                     PostMsg("rz=" & CType(SelectedPoint, BonePoint).GetQuaternion(BonePoint.QuaParam.QZ))
                     PostMsg("rw=" & CType(SelectedPoint, BonePoint).GetQuaternion(BonePoint.QuaParam.QW))
                 ElseIf tcmd = "bezier" Then
-                    Call GenerateBez()
+                    ExeMode = eExeMode.BEZIER
+                    SortPoint()
+                    Dim points As New List(Of PointF3)
+                    For i = 0 To ListBone(0).GetPointCount - 1 Step 2
+                        points.Add(ListBone(0).PointList(i).PosToP3)
+                        points.Add(ListBone(0).PointList(i + 1).PosToP3)
+                        points.Add(New PointF3)
+                    Next
+                    PenLine.LoadPoints(points)
+                    PenLine.GenerateBezier()
+                    Dim tempzoom As Single = 1.0F
+                    CanvasPenTool.LoadData(PenLine, tempzoom, New PointF3)
+                    'Call GenerateBez()
                     Call Paint()
                 ElseIf tcmd = "cardsd" Then
                     Call CardsDisperse(GetCardsPos)
@@ -406,7 +444,7 @@ lblFail:
                     '    AllowUpdate = True
                 ElseIf tcmd = "feedback" Then
                     Call OpenFeedbackPage()
-                ElseIf tcmd = "about" orelse tcmd = "info" Then
+                ElseIf tcmd = "about" OrElse tcmd = "info" Then
                     Call SoftwareInfo()
                 ElseIf tcmd = "applypy" Then
                     Call cPinyinConfig.ApplySinglePinyinOut(PYBlockList)
@@ -417,10 +455,17 @@ lblFail:
                 ElseIf tcmd = "wavmode" Then
                     ExeMode = eExeMode.WAV
                     Call Paint()
+                ElseIf tcmd = "bezmode" Then
+                    ExeMode = eExeMode.BEZIER
+                    Call Paint()
                 ElseIf tcmd = "clearface" Then
                     For Each face As Face In ListFace
                         face.PointList.Clear()
                     Next
+                    Call Paint()
+                ElseIf tcmd = "addbez" Then
+                    PenLine.Content.Add(New BezierPenPoint(New PointF3(0, 0, 0), New PointF3(5, 5, 5)))
+                    PenLine.GenerateBezier()
                     Call Paint()
 
                 Else
@@ -471,8 +516,9 @@ lblFail:
                     Call CardsCollect(CInt(tst(1)))
                     Call Paint()
                 ElseIf tcmd = "bezier" Then
-                    Call GenerateBez(0, CInt(tst(1)))
-                    Call Paint()
+                    PostMsg("指令已废弃")
+                    'Call GenerateBez(0, CInt(tst(1)))
+                    'Call Paint()
                 ElseIf tcmd = "py" Then
                     PostMsg("指令已废弃，请使用'pyb'")
                     'If ExeMode = eExeMode.PINYIN_MANUAL Then
@@ -497,12 +543,38 @@ lblFail:
                     FRAME_PER_SECOND = CInt(tst(1))
                     Call Paint()
                 ElseIf tcmd = "blocklength" Then
-                    If SelectedBlock isnot nothing then
-						dim head as CPYBlock = SelectedBlock.GetArrayHeadBlock
-						head.SetArrayAvgLength(csng(tst(1)))
-					else
-						postmsg("没有选中拼音块")
-					end If
+                    If SelectedBlock IsNot Nothing Then
+                        Dim head As CPYBlock = SelectedBlock.GetArrayHeadBlock
+                        head.SetArrayAvgLength(CSng(tst(1)))
+                    Else
+                        postmsg("没有选中拼音块")
+                    End If
+                    Call Paint()
+                ElseIf tcmd = "bezapply" Then
+                    Dim frame As Integer = CInt(tst(1))
+                    PenLine.GenerateBezier()
+                    For i = 0 To frame
+                        Dim p As New BonePoint
+                        Dim k As New AuxiliaryPolyline
+                        p.SetPos(PenLine.GetPoint(i / frame, k))
+                        p.Frame = i
+                        ListBone(0).AddPoint(p)
+                    Next
+                    ExeMode = eExeMode.VMD
+                    Call Paint()
+                ElseIf tcmd = "bezzoom" Then
+                    Dim zoom As Single = CSng(tst(1))
+                    If zoom <= 0 Then
+                        PostMsg("invalid value")
+                    Else
+                        CanvasPenTool.SetZoom(zoom)
+                        Call Paint()
+                    End If
+                ElseIf tcmd = "addallx" Then
+                    Dim value = CSng(tst(1))
+                    For Each p As BonePoint In ListBone(0).PointList
+                        p.X += value
+                    Next
                     Call Paint()
 
                 Else
@@ -557,16 +629,17 @@ lblFail:
                 If tcmd = "single" Then
                     PostMsg(BitConverter.ToSingle(Receive4Bytes(tst(1), tst(2), tst(3), tst(4)), 0).ToString)
                 ElseIf tcmd = "bezier" Then
-                    Dim plist As New List(Of PointF)
-                    With plist
-                        .Add(New PointF(CSng(tst(1)), CSng(tst(2))))
-                        .Add(New PointF(CSng(tst(3)), CSng(tst(4))))
-                        .Add(New PointF(0, 0))
-                        .Add(New PointF(1, 1))
-                    End With
+                    PostMsg("指令已废弃")
+                    'Dim plist As New List(Of PointF)
+                    'With plist
+                    '    .Add(New PointF(CSng(tst(1)), CSng(tst(2))))
+                    '    .Add(New PointF(CSng(tst(3)), CSng(tst(4))))
+                    '    .Add(New PointF(0, 0))
+                    '    .Add(New PointF(1, 1))
+                    'End With
 
-                    Call GenerateBez(plist)
-                    Call Paint()
+                    'Call GenerateBez(plist)
+                    'Call Paint()
                 ElseIf tcmd = "cardsf" Then
                     Call CardsFix(New PointF3(CSng(tst(1)), CSng(tst(2)), CSng(tst(3))), CSng(tst(4)))
                     Call Paint()
@@ -604,14 +677,17 @@ lblFail:
             ElseIf e.Y >= 400 / 2 AndAlso e.Y <= 460 / 2 Then
                 SelectedBlock = FindBlock(e)
                 Call Paint()
-			elseif e.Y < 300/2 then
-				WavControlBar.SetWavClickTag(e)
+            ElseIf e.Y < 300 / 2 Then
+                WavControlBar.SetWavClickTag(e)
             Else
                 If WavControlBar.JudgeHit(e) Then
                     MouseFlag = True
                     StartX = e.X
                 End If
             End If
+        ElseIf ExeMode = eExeMode.BEZIER Then
+            CanvasPenTool.Mouse_Down(e)
+            Call Paint()
         Else
             If e.Button = MouseButtons.Left Then
                 If SelectedPoint IsNot Nothing AndAlso e.Y >= 350 Then
@@ -661,6 +737,9 @@ lblFail:
                 Btn3.MouseUp(e)
             End If
             SelectedButton = -1
+        ElseIf ExeMode = eExeMode.BEZIER Then
+            CanvasPenTool.Mouse_Up(e)
+            Call Paint()
         End If
         LastDeltaFrame = 0
         MouseFlag = False
@@ -703,6 +782,22 @@ lblFail:
             End If
         End If
 
+        If ExeMode = eExeMode.BEZIER Then
+            CanvasPenTool.Mouse_Move(e)
+            Call Paint()
+        End If
+
+    End Sub
+
+    Private Sub P_MouseWheel(sender As Object, e As MouseEventArgs) Handles P.MouseWheel, TB1.MouseWheel, TB2.MouseWheel
+        If ExeMode = eExeMode.BEZIER Then
+            If e.Delta > 0 Then
+                CanvasPenTool.SetZoom(CanvasPenTool.GetZoom * 0.9)
+            ElseIf e.Delta < 0 Then
+                CanvasPenTool.SetZoom(CanvasPenTool.GetZoom / 0.9)
+            End If
+            Call Paint()
+        End If
     End Sub
 
     Private Function FindPoint(boneindex As Integer, frame As Integer) As MMDPoint
@@ -732,9 +827,7 @@ lblFail:
             For i = 0 To ListBone.Count - 1
                 Dim a As New Comparison(Of MMDPoint)(AddressOf cp)
                 ListBone(i).PointList.Sort(a)
-
             Next
-
         End If
     End Sub
 
@@ -1646,20 +1739,33 @@ lblFail:
     Public Async Sub PullRemoteCommand()
         '暂时不实现此功能
     End Sub
-	
-	''' <summary>
+
+    ''' <summary>
     ''' 显示软件信息
     ''' </summary>
-	public sub SoftwareInfo()
-		dim info as String = "Miz_MMD_Tool ver." & ME_VERSION & vbcrlf 
-		info = info & ME_RELEASE_TIME & vbCrlf
-		info = info & "开发者：sscs" & vbCrLf
+    Public Sub SoftwareInfo()
+        Dim info As String = "Miz_MMD_Tool ver." & ME_VERSION & vbcrlf
+        info = info & ME_RELEASE_TIME & vbCrlf
+        info = info & "开发者：sscs" & vbCrLf
         info = info & "项目主页 https://github.com/csMiz/MMT/tree/master/"
 
         MsgBox(info, MsgBoxStyle.Information, "关于此软件")
 
-    End sub 
-	
+    End Sub
 
+    Private Sub TB2_KeyDown(sender As Object, e As KeyEventArgs) Handles TB2.KeyDown, TB1.KeyDown
+        If ExeMode = eExeMode.BEZIER Then
+            CanvasPenTool.CTRLPressed = e.Control
+            CanvasPenTool.ALTPressed = e.Alt
+        End If
+
+    End Sub
+
+    Private Sub TB2_KeyUp(sender As Object, e As KeyEventArgs) Handles TB2.KeyUp, TB1.KeyUp
+        If ExeMode = eExeMode.BEZIER Then
+            CanvasPenTool.CTRLPressed = e.Control
+            CanvasPenTool.ALTPressed = e.Alt
+        End If
+    End Sub
 End Class
 

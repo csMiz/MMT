@@ -1,5 +1,5 @@
 ﻿Module MainApplication
-    Private TEST_MODE As Boolean = False
+    Private TEST_MODE As Boolean = True
 
     Public Sub main()
         If TEST_MODE Then
